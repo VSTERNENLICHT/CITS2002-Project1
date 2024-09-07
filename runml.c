@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>  // Ensure this line is present and correctly spelled
 
 // Check if the file extension is .ml
 bool checkFileExtension(const char* filePath) {
@@ -120,3 +121,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
