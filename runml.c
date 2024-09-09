@@ -5,13 +5,14 @@
 #include <ctype.h> 
 #include <unistd.h>
 
+
 // Define a simple structure to track variables
 typedef struct {
     char name[50];
     bool declared;
 } Variable;
 
-// Declare an array to store variables (max 50)
+// Declare an array to store variables
 Variable variables[50];
 int varCount = 0;
 
@@ -31,8 +32,8 @@ bool isValidSyntax(const char* line) {
     if (strncmp(line, "\tprint", 6) == 0) return true;
 
     if (strncmp(line, "return", 6) == 0) return true;
-    if (strncmp(line, "\treturn", 7) == 0) return true;
-    
+    if (strncmp(line, "\treturn",7) == 0) return true;
+
     // Check if it is an assignment "<-"
     if (strstr(line, "<-") != NULL) return true;
     
@@ -75,26 +76,56 @@ void translateToC(FILE *outputFile, const char* line) {
         return;
     }
 
-    // Handle function body (lines starting with spaces or tabs)
-    if (line[0] == ' ' || line[0] == '\t') {
-        // Handle print statement with expressions, such as "print a + b"
-        if (strstr(line, "print") != NULL) {
-            char expression[200];
-            sscanf(line, " print %[^n]", expression);  // Extract everything after 'print'
-            
-            // Print the expression inside the function, check if it's an integer
-            fprintf(outputFile,
-                "    if ((%s) == (int)(%s)) printf(\"%%d\\n\", (int)(%s)); else printf(\"%%.6f\\n\", (double)(%s));\n",
-                expression, expression, expression, expression);
-            return;
-        }
+    // Handle print statement inside a function
+    if (strncmp(line, "\tprint", 7) == 0) {
+        char expression[200];
+        sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
+
+        // Print the expression, check if it's an integer
+        fprintf(outputFile,
+            "\tprintf(\"%%.6f\\n\", (double)(%s));\n",
+            expression);
+        return;
     }
 
-    // Handle function call
+    // Handle print statement
+    if (strncmp(line, "print", 5) == 0) {
+        char expression[200];
+        sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
+
+        fprintf(outputFile,
+            "printf(\"%%.6f\\n\", (double)(%s));\n",
+            expression);
+        return;
+    }
+
+    // Handle print statement
+    if (strncmp(line, "return", 6) == 0) {
+        char expression[200];
+        sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
+
+        // Print the expression, check if it's an integer
+        fprintf(outputFile,
+            "return %s;\n", expression);
+        return;
+    }
+
+    // Handle return statement inside a function
+    if (strncmp(line, "\treturn", 7) == 0) {
+        char expression[200];
+        sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'print'
+
+        // Print the expression, check if it's an integer
+        fprintf(outputFile,
+            "\treturn %s;\n", expression);
+        return;
+    }
+
+    // Handle function call by removing tuple parentheses
     if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
-        char funcCall[200];
-        sscanf(line, "%[^\n]", funcCall);  // Extract the function call
-        fprintf(outputFile, "%s;\n", funcCall);  // Call function in C
+        char funcName[50], param1[50], param2[50];
+        sscanf(line, "%s (%s, %s)", funcName, param1, param2);  // Parse the function name and arguments
+        fprintf(outputFile, "%s(%s, %s);\n", funcName, param1, param2);  // Translate to C style function call
         return;
     }
 
@@ -126,15 +157,17 @@ void translateToC(FILE *outputFile, const char* line) {
     }
 }
 
+
+
 // Compile the generated C code
 void compileCFile(const char* cFileName, int pid) {
     char command[256];
     snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
     if (result == 0) {
-        printf("C code compiled successfully!\n");
+        printf("C code compiled successfully!\n");  // Should be removed before submission
     } else {
-        fprintf(stderr, "Error during compilation!\n");
+        fprintf(stderr, "Error during compilation!\n"); // Should be modified before submission
         exit(EXIT_FAILURE);
     }
 }
@@ -142,7 +175,7 @@ void compileCFile(const char* cFileName, int pid) {
 // Run the compiled executable
 void runExecutable(char* cFileName) {
     int len = strlen(cFileName);
-    cFileName[len - 2] = '\0'; // Remove ".c" from filename
+    cFileName[len - 2] = '\0';
     const char* originalFileName = cFileName;  // Example file name
     char executableFile[100];  // Buffer to hold the result with "./" prepended
 
@@ -151,7 +184,7 @@ void runExecutable(char* cFileName) {
 
     int result = system(executableFile);  // Run the compiled executable
     if (result != 0) {
-        fprintf(stderr, "Error running the executable!\n");
+        fprintf(stderr, "Error running the executable!\n"); // Should be modified before submission
         exit(EXIT_FAILURE);
     }
 }
@@ -168,12 +201,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    int pid = getpid(); // Get process id to set program name
+    int pid = getpid(); // get process id to set program name
     char cFileName[50];
     snprintf(cFileName, sizeof(cFileName), "ml-%d.c", pid);
 
     // Open a C file to write the translated C code
-    FILE *cFile = fopen(cFileName, "w");
+    FILE *cFile = fopen(cFileName, "w");    //runml generates C11 code in a file named, for example, ml-12345.c (where 12345 could be a process-ID)
     if (!cFile) {
         fprintf(stderr, "Error creating C file\n");
         exit(EXIT_FAILURE);
@@ -182,7 +215,7 @@ int main(int argc, char *argv[]) {
     // Write standard headers for the C code
     fprintf(cFile, "#include <stdio.h>\n\nint main() {\n");
 
-    // Read and process the ML file line by line
+    // Read and process the ml file line by line
     char line[256];
     while (fgets(line, sizeof(line), file)) {
         // Remove the newline character at the end of each line
@@ -200,8 +233,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Ensure the main function is closed after processing all lines
-    fprintf(cFile, "return 0;\n}\n");  // Properly close the main function
+    // End the C program's main function
+    fprintf(cFile, "return 0;\n}\n");
 
     fclose(file);
     fclose(cFile);
