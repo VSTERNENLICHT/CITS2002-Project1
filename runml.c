@@ -465,6 +465,9 @@ int main(int argc, char *argv[]) {
             // If the line defines a function, write it to the function definitions section
             if (strncmp(line, "function", 8) == 0) {
                 translateToC(funcDefFile, line);  // Write function definitions to funcDefFile
+            } else if (strncmp(line, "\t", 1) == 0) {
+                translateToC(funcDefFile, line);
+                fprintf(funcDefFile, "}");
             } else {
                 translateToC(mainFuncFile, line);  // Write main function logic to mainFuncFile
             }
