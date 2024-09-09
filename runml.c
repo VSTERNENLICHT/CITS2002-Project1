@@ -254,9 +254,11 @@ int main(int argc, char *argv[]) {
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
     char funcDefLine[256];
     bool returnExists = false;
+    bool hasFunctionDefinitions = false;  // Flag to track if any function definitions were written
 
     // First, read through the function definitions to check if there is a return statement
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
+        hasFunctionDefinitions = true;  // Mark that we have function definitions
         if (strstr(funcDefLine, "return") != NULL) {
             returnExists = true;
             break;
@@ -288,6 +290,10 @@ int main(int argc, char *argv[]) {
         }
         // Write the (possibly modified) line into the cFile
         fputs(funcDefLine, cFile);
+    }
+    // After writing all function definitions, only close the function with `}` if we wrote any definitions
+    if (hasFunctionDefinitions) {
+        fprintf(cFile, "}\n");
     }
     
 
