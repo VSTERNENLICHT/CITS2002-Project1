@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <ctype.h>  // Ensure this line is present and correctly spelled
+#include <ctype.h>  
+#include <unistd.h>
 
 
 // Define a simple structure to track variables
@@ -110,7 +111,7 @@ void translateToC(FILE *outputFile, const char* line) {
     }
 
     // Handle end of function block
-    if (strncmp(line, "end", 3) == 0) {
+    if (strncmp(line, "end", 3) == 0) { 
         fprintf(outputFile, "}\n");  // Close function block in C
         return;
     }
@@ -123,9 +124,9 @@ void translateToC(FILE *outputFile, const char* line) {
 
 
 // Compile the generated C code
-void compileCFile(const char* cFileName) {
+void compileCFile(const char* cFileName, int pid) {
     char command[256];
-    snprintf(command, sizeof(command), "cc -std=c11 -o generated_program %s", cFileName);
+    snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
     if (result == 0) {
         printf("C code compiled successfully!\n");  // Should be removed before submission
@@ -146,7 +147,7 @@ void runExecutable() {
 
 int main(int argc, char *argv[]) {
     if (argc != 2 || !checkFileExtension(argv[1])) {
-        fprintf(stderr, "Usage: %s program.ml\n", argv[0]); // Why do we need argv[0]?
+        fprintf(stderr, "Usage: %s program.ml\n", argv[0]); // Why do we need argv[0] here?
         exit(EXIT_FAILURE);
     }
 
@@ -156,8 +157,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    int pid = getpid(); // get process id to set program name
+    char cFileName[50];
+    snprintf(cFileName, sizeof(cFileName), "ml-%d.c", pid);
+
     // Open a C file to write the translated C code
-    FILE *cFile = fopen("generated_program.c", "w");    //runml generates C11 code in a file named, for example, ml-12345.c (where 12345 could be a process-ID)
+    FILE *cFile = fopen(cFileName, "w");    //runml generates C11 code in a file named, for example, ml-12345.c (where 12345 could be a process-ID)
     if (!cFile) {
         fprintf(stderr, "Error creating C file\n");
         exit(EXIT_FAILURE);
@@ -191,7 +196,7 @@ int main(int argc, char *argv[]) {
     fclose(cFile);
 
     // Compile the generated C code
-    compileCFile("generated_program.c");
+    compileCFile("generated_program.c", pid);
 
     // Run the compiled program
     runExecutable();

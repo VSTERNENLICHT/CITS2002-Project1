@@ -1,6 +1,6 @@
 #include <stdio.h>
 
 int main() {
-//  72 is printed
+//  18 is printed
 // 
-void multiply(double a, double b) {
+void printsum(double a, double b) {
