@@ -33,6 +33,7 @@ bool isValidSyntax(const char* line) {
 
     if (strncmp(line, "return", 6) == 0) return true;
     if (strncmp(line, "\treturn",7) == 0) return true;
+    if (strncmp(line, "\0", 1) == 0) return true;
 
     // Check if it is an assignment "<-"
     if (strstr(line, "<-") != NULL) return true;
@@ -64,35 +65,39 @@ void declareVariable(const char* var) {
 // Correct the function to handle function calls and fix the um(12, 6) error
 void translateToC(FILE *outputFile, const char* line) {
     // Skip comments that start with '#'
-    if (line[0] == '#') {
+    if (strncmp(line, "#", 1) == 0) {
         fprintf(outputFile, "// %s\n", line + 1);  // Write comment to C file, excluding the '#' character
         return;
     }
-
+    if (strncmp(line, "\n", 1) == 0){
+        fprintf(outputFile, "\n");  // Write comment to C file, excluding the new line character
+        return;
+    }
+    
     // Handle function definition
-if (strncmp(line, "function", 8) == 0) {
-    char funcName[50];
-    char param1[50] = "";  // First parameter
-    char param2[50] = "";  // Second parameter, might be empty if not provided
+    if (strncmp(line, "function", 8) == 0) {
+        char funcName[50];
+        char param1[50] = "";  // First parameter
+        char param2[50] = "";  // Second parameter, might be empty if not provided
 
-    // Parse the function name and parameters (assuming a maximum of 2 parameters)
-    int paramCount = sscanf(line, "function %s %s %s", funcName, param1, param2);
+        // Parse the function name and parameters (assuming a maximum of 2 parameters)
+        int paramCount = sscanf(line, "function %s %s %s", funcName, param1, param2);
 
-    // If only one parameter was provided
-    if (paramCount == 2) {
-        // Define a function with one parameter
-        fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
+        // If only one parameter was provided
+        if (paramCount == 2) {
+            // Define a function with one parameter
+            fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
+        }
+        // If two parameters were provided
+        else if (paramCount == 3) {
+            // Define a function with two parameters
+            fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
+        } else {
+            fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+            exit(EXIT_FAILURE);
+        }
+        return;
     }
-    // If two parameters were provided
-    else if (paramCount == 3) {
-        // Define a function with two parameters
-        fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
-    } else {
-        fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
-        exit(EXIT_FAILURE);
-    }
-    return;
-}
 
 
     // Handle print statement inside a function
@@ -145,25 +150,25 @@ if (strncmp(line, "function", 8) == 0) {
     }
 
     // Handle function call and ensure it is properly parsed
-    if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
-        char funcCall[200];
-        sscanf(line, "%[^\n]", funcCall);  // Extract the function call
-        // Clean up spaces around parentheses in function calls (fix the 'um' issue)
-        char cleanFuncCall[200];
-        int i = 0, j = 0;
-        while (funcCall[i] != '\0') {
-            if (funcCall[i] != ' ' || (i > 0 && funcCall[i - 1] != '(' && funcCall[i - 1] != ')')) {
-                cleanFuncCall[j++] = funcCall[i];
-            }
-            i++;
-        }
-        cleanFuncCall[j] = '\0';
-        fprintf(outputFile, "%s;\n", cleanFuncCall);  // Write cleaned function call to C file
-        return;
-    }
+    // if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
+    //     char funcCall[200];
+    //     sscanf(line, "%[^\n]", funcCall);  // Extract the function call
+    //     // Clean up spaces around parentheses in function calls (fix the 'um' issue)
+    //     char cleanFuncCall[200];
+    //     int i = 0, j = 0;
+    //     while (funcCall[i] != '\0') {
+    //         if (funcCall[i] != ' ' || (i > 0 && funcCall[i - 1] != '(' && funcCall[i - 1] != ')')) {
+    //             cleanFuncCall[j++] = funcCall[i];
+    //         }
+    //         i++;
+    //     }
+    //     cleanFuncCall[j] = '\0';
+    //     fprintf(outputFile, "%s;\n", cleanFuncCall);  // Write cleaned function call to C file
+    //     return;
+    // }
 
     // Handle assignment statement
-    else if (strstr(line, "<-") != NULL) {
+    if (strstr(line, "<-") != NULL) {
         char var[50], expr[200];
         sscanf(line, "%s <- %[^\n]", var, expr);  // Extract the variable and expression
         // If the variable hasn't been declared, declare it as a double
@@ -176,6 +181,9 @@ if (strncmp(line, "function", 8) == 0) {
         }
         return;
     }
+    
+
+
 
     // Handle end of function block
     if (strncmp(line, "end", 3) == 0) {
@@ -269,8 +277,6 @@ int main(int argc, char *argv[]) {
     FILE *funcDefFile = tmpfile();  // Create a temporary file to store function definitions
 
     FILE *upperFuncFile = tmpfile();    // Create a temporary file to store lines before function
-
-    // FILE *tmpUpperFile =tmpfile();  // To store upper lines if there is function
 
     bool funcExists = false;    // Checks if lines for the main statement has been read
 
