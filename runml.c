@@ -81,12 +81,12 @@ if (strncmp(line, "function", 8) == 0) {
     // If only one parameter was provided
     if (paramCount == 2) {
         // Define a function with one parameter
-        fprintf(outputFile, "double %s(double %s) {\n", funcName, param1);
+        fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
     }
     // If two parameters were provided
     else if (paramCount == 3) {
         // Define a function with two parameters
-        fprintf(outputFile, "double %s(double %s, double %s) {\n", funcName, param1, param2);
+        fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
     } else {
         fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
         exit(EXIT_FAILURE);
@@ -194,9 +194,7 @@ void compileCFile(const char* cFileName, int pid) {
     char command[256];
     snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
-    if (result == 0) {
-        printf("C code compiled successfully!\n");  // Should be removed before submission
-    } else {
+    if (result != 0) {
         fprintf(stderr, "Error during compilation!\n"); // Should be modified before submission
         exit(EXIT_FAILURE);
     }
@@ -227,8 +225,6 @@ void cleanUpFiles(const char* cFileName, int pid) {
     int removeCFileStatus = system(removeCFile);
     if (removeCFileStatus != 0) {
         fprintf(stderr, "Error removing the generated C file: %s\n", cFileName);
-    } else {
-        printf("Successfully removed the generated C file: %s.c\n", cFileName); // REMOVE BEFORE SUBMIT
     }
 
     // Remove the executable
@@ -237,8 +233,6 @@ void cleanUpFiles(const char* cFileName, int pid) {
     int removeExecStatus = system(removeExecutable);
     if (removeExecStatus != 0) {
         fprintf(stderr, "Error removing the compiled executable: ml-%d\n", pid);
-    } else {
-        printf("Successfully removed the compiled executable: ml-%d\n", pid);   // REMOVE BEFORE SUBMIT
     }
 }
 
@@ -354,10 +348,10 @@ int main(int argc, char *argv[]) {
             break;
         }
     }
-
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         if (returnExists) {
+            
         // Check if "void" exists in the current line
             if (strstr(funcDefLine, "void") != NULL) {
                 // Replace "void" with "double"
@@ -412,7 +406,7 @@ int main(int argc, char *argv[]) {
     runExecutable(cFileName);
 
     // Remove the compiled and c file
-    // cleanUpFiles(cFileName, pid);
+    cleanUpFiles(cFileName, pid);
 
     exit(EXIT_SUCCESS);
 }
