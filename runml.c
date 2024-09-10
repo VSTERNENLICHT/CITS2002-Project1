@@ -101,15 +101,11 @@ if (strncmp(line, "function", 8) == 0) {
         sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
         // Print the expression inside the function
         // fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)(%s));\n", expression);
-        if (strchr(expression, '*') != NULL || strchr(expression, '+') != NULL || strchr(expression, '-') != NULL || strchr(expression, '/') != NULL) {
-            fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
-            fprintf(outputFile, "\tprintf(\"%%.1f\\n\", (double)%s);\n", expression);
-            fprintf(outputFile, "} else {\n");
-            fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)%s);\n", expression);
-            fprintf(outputFile, "}\n");
-        } else {
-            fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
-        }
+        fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
+        fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
+        fprintf(outputFile, "} else {\n");
+        fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)%s);\n", expression);
+        fprintf(outputFile, "}\n");
         return;
     }
 
@@ -118,15 +114,11 @@ if (strncmp(line, "function", 8) == 0) {
         char expression[200];
         sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
         // fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
-        if (strchr(expression, '*') != NULL || strchr(expression, '+') != NULL || strchr(expression, '-') != NULL || strchr(expression, '/') != NULL) {
-            fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
-            fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
-            fprintf(outputFile, "} else {\n");
-            fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)%s);\n", expression);
-            fprintf(outputFile, "}\n");
-        } else {
-            fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
-        }
+        fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
+        fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
+        fprintf(outputFile, "} else {\n");
+        fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)%s);\n", expression);
+        fprintf(outputFile, "}\n");
         return;
     }
 
@@ -284,7 +276,9 @@ int main(int argc, char *argv[]) {
 
     FILE *upperFuncFile = tmpfile();    // Create a temporary file to store lines before function
 
-    bool mainExists = false;    // Checks if lines for the main statement has been read
+    // FILE *tmpUpperFile =tmpfile();  // To store upper lines if there is function
+
+    bool funcExists = false;    // Checks if lines for the main statement has been read
 
     // Read and process the ML file line by line
     char line[256];
@@ -296,16 +290,13 @@ int main(int argc, char *argv[]) {
         if (isValidSyntax(line)) {
             // If the line defines a function, write it to the function definitions section
             if (strncmp(line, "function", 8) == 0) {
-                mainExists = true;
+                funcExists = true;
                 translateToC(funcDefFile, line);  // Write function definitions to funcDefFile
             } else if (strncmp(line, "\t", 1) == 0) {
                 translateToC(funcDefFile, line);
             } else {
-                if (!mainExists) {
-                    translateToC(upperFuncFile, line);
-                } else {
-                    translateToC(mainFuncFile, line);  // Write main function logic to mainFuncFile
-                }
+                if (!funcExists) translateToC(upperFuncFile, line);
+                else translateToC(mainFuncFile, line);
             }
         } else {
             fprintf(stderr, "Syntax error in line: %s\n", line);
@@ -317,32 +308,37 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // // Move upperFuncFile tmp file to the top of the file
-    // fseek(upperFuncFile, 0, SEEK_SET);
-    // char upperFuncLine[256];
-    // while (fgets(upperFuncLine, sizeof(upperFuncLine), upperFuncFile)) {
-    //     // Check if "void" exists in the current line
-    //     if (strstr(upperFuncLine, "void") != NULL) {
-    //         // Replace "void" with "double"
-    //         char *pos = strstr(upperFuncLine, "void");
-    //         if (pos != NULL) {
-    //             // Create a temporary buffer for the modified line
-    //             char temp[256];
-    //             // Copy the part of the line before "void"
-    //             strncpy(temp, upperFuncLine, pos - upperFuncLine);
-    //             temp[pos - upperFuncLine] = '\0';  // Null-terminate the string
+    // Move upperFuncFile tmp file to the top of the file
+    fseek(upperFuncFile, 0, SEEK_SET);
+    char upperFuncLine[256];
+    while (fgets(upperFuncLine, sizeof(upperFuncLine), upperFuncFile)) {
+        // Check if "void" exists in the current line
+        if (strstr(upperFuncLine, "void") != NULL) {
+            // Replace "void" with "double"
+            char *pos = strstr(upperFuncLine, "void");
+            if (pos != NULL) {
+                // Create a temporary buffer for the modified line
+                char temp[256];
+                // Copy the part of the line before "void"
+                strncpy(temp, upperFuncLine, pos - upperFuncLine);
+                temp[pos - upperFuncLine] = '\0';  // Null-terminate the string
                 
-    //             // Concatenate "double" and the remaining part of the line after "void"
-    //             strcat(temp, "double");
-    //             strcat(temp, pos + 4);  // Skip 4 characters ("void")
+                // Concatenate "double" and the remaining part of the line after "void"
+                strcat(temp, "double");
+                strcat(temp, pos + 4);  // Skip 4 characters ("void")
 
-    //             // Copy the modified line back into funcDefLine
-    //             strcpy(upperFuncLine, temp);
-    //         }
-    //     }
-    //     // Write the (possibly modified) line into the cFile
-    //     fputs(upperFuncLine, cFile);
-    // }
+                // Copy the modified line back into upperFuncLine
+                strcpy(upperFuncLine, temp);
+            }
+        }
+        if (funcExists) {
+            // Write the (possibly modified) line into the tmpUpperFile
+            fputs(upperFuncLine, cFile);
+        } else {
+            // Write the (possibly modified) line into the mainFuncFile
+            fputs(upperFuncLine, mainFuncFile);
+        }
+    }
 
     // Move function definitions to the top of the file
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
@@ -360,34 +356,9 @@ int main(int argc, char *argv[]) {
     }
 
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
-    fseek(upperFuncFile, 0, SEEK_SET);  // Move to the beginning of the upperFuncFile
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         if (returnExists) {
         // Check if "void" exists in the current line
-            char upperFuncLine[256];
-            while (fgets(upperFuncLine, sizeof(upperFuncLine), upperFuncFile)) {
-                // Check if "void" exists in the current line
-                if (strstr(upperFuncLine, "void") != NULL) {
-                    // Replace "void" with "double"
-                    char *pos = strstr(upperFuncLine, "void");
-                    if (pos != NULL) {
-                        // Create a temporary buffer for the modified line
-                        char temp[256];
-                        // Copy the part of the line before "void"
-                        strncpy(temp, upperFuncLine, pos - upperFuncLine);
-                        temp[pos - upperFuncLine] = '\0';  // Null-terminate the string
-                        
-                        // Concatenate "double" and the remaining part of the line after "void"
-                        strcat(temp, "double");
-                        strcat(temp, pos + 4);  // Skip 4 characters ("void")
-
-                        // Copy the modified line back into funcDefLine
-                        strcpy(upperFuncLine, temp);
-                    }
-                }
-                // Write the (possibly modified) line into the cFile
-                fputs(upperFuncLine, cFile);
-            }
             if (strstr(funcDefLine, "void") != NULL) {
                 // Replace "void" with "double"
                 char *pos = strstr(funcDefLine, "void");
@@ -406,7 +377,7 @@ int main(int argc, char *argv[]) {
                     strcpy(funcDefLine, temp);
                 }
             }
-        } 
+        }
         // Write the (possibly modified) line into the cFile
         fputs(funcDefLine, cFile);
     }
