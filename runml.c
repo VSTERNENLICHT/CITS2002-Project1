@@ -70,19 +70,46 @@ void translateToC(FILE *outputFile, const char* line) {
     }
 
     // Handle function definition
-    if (strncmp(line, "function", 8) == 0) {
-        char funcName[50], param1[50], param2[50];
-        sscanf(line, "function %s %s %s", funcName, param1, param2);  // Parse function name and parameters
-        fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);  // Define function in C
-        return;
+if (strncmp(line, "function", 8) == 0) {
+    char funcName[50];
+    char param1[50] = "";  // First parameter
+    char param2[50] = "";  // Second parameter, might be empty if not provided
+
+    // Parse the function name and parameters (assuming a maximum of 2 parameters)
+    int paramCount = sscanf(line, "function %s %s %s", funcName, param1, param2);
+
+    // If only one parameter was provided
+    if (paramCount == 2) {
+        // Define a function with one parameter
+        fprintf(outputFile, "double %s(double %s) {\n", funcName, param1);
     }
+    // If two parameters were provided
+    else if (paramCount == 3) {
+        // Define a function with two parameters
+        fprintf(outputFile, "double %s(double %s, double %s) {\n", funcName, param1, param2);
+    } else {
+        fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+        exit(EXIT_FAILURE);
+    }
+    return;
+}
+
 
     // Handle print statement inside a function
     if (strncmp(line, "\tprint", 6) == 0) {
         char expression[200];
         sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
         // Print the expression inside the function
-        fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)(%s));\n", expression);
+        // fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)(%s));\n", expression);
+        if (strchr(expression, '*') != NULL || strchr(expression, '+') != NULL || strchr(expression, '-') != NULL || strchr(expression, '/') != NULL) {
+            fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
+            fprintf(outputFile, "\tprintf(\"%%.1f\\n\", (double)%s);\n", expression);
+            fprintf(outputFile, "} else {\n");
+            fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)%s);\n", expression);
+            fprintf(outputFile, "}\n");
+        } else {
+            fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
+        }
         return;
     }
 
@@ -90,7 +117,16 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "print ", 6) == 0) {
         char expression[200];
         sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
-        fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
+        // fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
+        if (strchr(expression, '*') != NULL || strchr(expression, '+') != NULL || strchr(expression, '-') != NULL || strchr(expression, '/') != NULL) {
+            fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
+            fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
+            fprintf(outputFile, "} else {\n");
+            fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)%s);\n", expression);
+            fprintf(outputFile, "}\n");
+        } else {
+            fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
+        }
         return;
     }
 
