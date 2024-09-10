@@ -222,8 +222,31 @@ void runExecutable(char* cFileName) {
 
     int result = system(executableFile);  // Run the compiled executable
     if (result != 0) {
-        fprintf(stderr, "Error running the executable!\n"); // Should be modified before submission
+        fprintf(stderr, "Error running the executable!\n"); 
         exit(EXIT_FAILURE);
+    }
+}
+
+// Remove the generated C file and the executable
+void cleanUpFiles(const char* cFileName, int pid) {
+    // Remove the .c file
+    char removeCFile[100];
+    snprintf(removeCFile, sizeof(removeCFile), "rm -f %s.c", cFileName);  // -f flag forces removal
+    int removeCFileStatus = system(removeCFile);
+    if (removeCFileStatus != 0) {
+        fprintf(stderr, "Error removing the generated C file: %s\n", cFileName);
+    } else {
+        printf("Successfully removed the generated C file: %s.c\n", cFileName); // REMOVE BEFORE SUBMIT
+    }
+
+    // Remove the executable
+    char removeExecutable[100];
+    snprintf(removeExecutable, sizeof(removeExecutable), "rm -f ml-%d", pid);
+    int removeExecStatus = system(removeExecutable);
+    if (removeExecStatus != 0) {
+        fprintf(stderr, "Error removing the compiled executable: ml-%d\n", pid);
+    } else {
+        printf("Successfully removed the compiled executable: ml-%d\n", pid);   // REMOVE BEFORE SUBMIT
     }
 }
 
@@ -357,5 +380,8 @@ int main(int argc, char *argv[]) {
     // Run the compiled program
     runExecutable(cFileName);
 
-    return 0;
+    // Remove the compiled and c file
+    cleanUpFiles(cFileName, pid);
+
+    exit(EXIT_SUCCESS);
 }
