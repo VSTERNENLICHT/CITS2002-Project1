@@ -149,24 +149,6 @@ void translateToC(FILE *outputFile, const char* line) {
         return;
     }
 
-    // Handle function call and ensure it is properly parsed
-    // if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
-    //     char funcCall[200];
-    //     sscanf(line, "%[^\n]", funcCall);  // Extract the function call
-    //     // Clean up spaces around parentheses in function calls (fix the 'um' issue)
-    //     char cleanFuncCall[200];
-    //     int i = 0, j = 0;
-    //     while (funcCall[i] != '\0') {
-    //         if (funcCall[i] != ' ' || (i > 0 && funcCall[i - 1] != '(' && funcCall[i - 1] != ')')) {
-    //             cleanFuncCall[j++] = funcCall[i];
-    //         }
-    //         i++;
-    //     }
-    //     cleanFuncCall[j] = '\0';
-    //     fprintf(outputFile, "%s;\n", cleanFuncCall);  // Write cleaned function call to C file
-    //     return;
-    // }
-
     // Handle assignment statement
     if (strstr(line, "<-") != NULL) {
         char var[50], expr[200];
@@ -181,9 +163,6 @@ void translateToC(FILE *outputFile, const char* line) {
         }
         return;
     }
-    
-
-
 
     // Handle end of function block
     if (strncmp(line, "end", 3) == 0) {
@@ -357,7 +336,6 @@ int main(int argc, char *argv[]) {
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         if (returnExists) {
-            
         // Check if "void" exists in the current line
             if (strstr(funcDefLine, "void") != NULL) {
                 // Replace "void" with "double"
