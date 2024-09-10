@@ -127,25 +127,45 @@ void translateToC(FILE *outputFile, const char* line) {
         return;
     }
 
-        // Handle print statement
-    if (strncmp(line, "return", 6) == 0) {
-        char expression[200];
-        sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
+    //     // Handle print statement
+    // if (strncmp(line, "return", 6) == 0) {
+    //     char expression[200];
+    //     sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
 
-        // Print the expression, check if it's an integer
-        fprintf(outputFile,
-            "return %s;\n", expression);
-        return;
-    }
+    //     // Print the expression, check if it's an integer
+    //     fprintf(outputFile,
+    //         "return %s;\n", expression);
+    //     return;
+    // }
+
+    // // Handle return statement inside a function
+    // if (strncmp(line, "\treturn", 7) == 0) {
+    //     char expression[200];
+    //     sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'print'
+
+    //     // Print the expression, check if it's an integer
+    //     fprintf(outputFile,
+    //         "\treturn %s;\n", expression);
+    //     return;
+    // }
 
     // Handle return statement inside a function
-    if (strncmp(line, "\treturn", 7) == 0) {
+    if (strncmp(line, "\treturn", 7) == 0 || strncmp(line, "return", 6) == 0) {
         char expression[200];
-        sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'print'
+        
+        // Differentiate between indented and non-indented return statements
+        if (line[0] == '\t') {
+            sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'return'
+        } else {
+            sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'return'
+        }
 
-        // Print the expression, check if it's an integer
-        fprintf(outputFile,
-            "\treturn %s;\n", expression);
+        // Print the return statement
+        fprintf(outputFile, "\treturn %s;\n", expression);
+
+        // Now add the closing brace '}' right after the return statement
+        fprintf(outputFile, "}\n");
+
         return;
     }
 
@@ -334,6 +354,7 @@ int main(int argc, char *argv[]) {
         }
     }
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
+
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         if (returnExists) {
         // Check if "void" exists in the current line
@@ -362,6 +383,7 @@ int main(int argc, char *argv[]) {
     // After writing all function definitions, only close the function with `}` if we wrote any definitions
     if (hasFunctionDefinitions) {
         fprintf(cFile, "}\n");
+        hasFunctionDefinitions = false;
     }
     
 
@@ -390,7 +412,7 @@ int main(int argc, char *argv[]) {
     runExecutable(cFileName);
 
     // Remove the compiled and c file
-    cleanUpFiles(cFileName, pid);
+    // cleanUpFiles(cFileName, pid);
 
     exit(EXIT_SUCCESS);
 }
