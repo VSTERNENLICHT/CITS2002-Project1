@@ -346,8 +346,18 @@ int main(int argc, char *argv[]) {
 // Move function definitions to the top of the file
 fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
 char funcDefLine[256];
-
+bool returnExists = false;  // Track if there is a return statement in the function
 bool functionOpen = false;  // Track if a function block is open
+
+// First, read through the function definitions to check if there is a return statement
+while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
+    // Check if there is a return statement
+    if (strstr(funcDefLine, "return") != NULL) {
+        returnExists = true;
+        break;  // Found a return, no need to continue checking
+    }
+}
+fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
 
 while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
     // Check if we have reached a new function definition
@@ -355,12 +365,11 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         // If a function is already open, close it
         if (functionOpen) {
             fprintf(cFile, "}\n");  // Close the previous function
-            printf("Closing function. functionOpen set to false.\n");  // Print the flag state
-            functionOpen = false;   // Reset the flag
+            printf("Closing function. functionOpen set to false.\n");
+            functionOpen = false;
         }
         
-        // Now, handle the new function definition
-        // Replace "void" with "double" as necessary
+        // Now handle the new function definition
         char *pos = strstr(funcDefLine, "void");
         if (pos != NULL) {
             // Create a temporary buffer for the modified line
@@ -369,8 +378,16 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
             strncpy(temp, funcDefLine, pos - funcDefLine);
             temp[pos - funcDefLine] = '\0';  // Null-terminate the string
 
-            // Concatenate "double" and the remaining part of the line after "void"
-            strcat(temp, "double");
+            // If the function contains a return statement, change "void" to "double"
+            if (returnExists) {
+                strcat(temp, "double");
+                printf("Found return. Changing void to double.\n");
+            } else {
+                strcat(temp, "void");  // Keep it as void
+                printf("No return. Keeping void.\n");
+            }
+
+            // Concatenate the remaining part of the line after "void"
             strcat(temp, pos + 4);  // Skip 4 characters ("void")
 
             // Write the modified function definition to the C file
@@ -378,22 +395,22 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
 
             // Set the functionOpen flag to true, indicating an open function block
             functionOpen = true;
-            printf("Opening function. functionOpen set to true.\n");  // Print the flag state
+            printf("Opening function. functionOpen set to true.\n");
         }
     } else {
         // Handle other lines (e.g., inside the function)
         fputs(funcDefLine, cFile);
+        returnExists = false;
     }
 }
 
 // Ensure that any remaining open function block is closed
 if (functionOpen) {
     fprintf(cFile, "}\n");
-    printf("Closing final function. functionOpen set to false.\n");  // Print the flag state
+    printf("Closing final function. functionOpen set to false.\n");
     functionOpen = false;
 }
 
-    
 
     // // After writing all function definitions, only close the function with `}` if we wrote any definitions
     // if (hasFunctionDefinitions) {
