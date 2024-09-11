@@ -47,6 +47,16 @@ bool isValidSyntax(const char* line) {
     return false;
 }
 
+
+// Update the variable declaration status
+void updateVariableDeclaration(const char* var, bool declaredStatus) {
+    for (int i = 0; i < varCount; i++) {
+        if (strcmp(variables[i].name, var) == 0) {
+            variables[i].declared = declaredStatus;  // Update the declared status
+            return;
+        }
+    }
+}
 // Check if a variable has been declared before
 bool isVariableDeclared(const char* var) {
     for (int i = 0; i < varCount; i++) {
@@ -76,37 +86,80 @@ void translateToC(FILE *outputFile, const char* line) {
         return;
     }
     
+    // // Handle function definition
+    // if (strncmp(line, "function", 8) == 0) {
+    //     char funcName[50];
+    //     char param1[50] = "";  // First parameter
+    //     char param2[50] = "";  // Second parameter, might be empty if not provided
+    //     char param3[50] = "";  // Third parameter, might be empty if not provided
+
+    //     // Parse the function name and parameters (assuming a maximum of 2 parameters)
+    //     int paramCount = sscanf(line, "function %s %s %s %s", funcName, param1, param2, param3);
+
+    //     // If only one parameter was provided
+    //     if (paramCount == 2) {
+    //         // Define a function with one parameter
+    //         fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
+    //     }
+    //     // If two parameters were provided
+    //     else if (paramCount == 3) {
+    //         // Define a function with two parameters
+    //         fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
+    //     } else if (paramCount == 4) {
+    //         // Define a function with two parameters
+    //         fprintf(outputFile, "void %s(double %s, double %s, double %s) {\n", funcName, param1, param2, param3);
+    //     } else {
+    //         fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+    //         exit(EXIT_FAILURE);
+    //     }
+
+    //     FuncdefineCount++;
+    //     return;
+    // }
+
     // Handle function definition
     if (strncmp(line, "function", 8) == 0) {
         char funcName[50];
-        char param1[50] = "";  // First parameter
-        char param2[50] = "";  // Second parameter, might be empty if not provided
-        char param3[50] = "";  // Third parameter, might be empty if not provided
+        char* params[10];  // Assuming a maximum of 10 parameters
+        int paramCount = 0;
 
-        // Parse the function name and parameters (assuming a maximum of 2 parameters)
-        int paramCount = sscanf(line, "function %s %s %s %s", funcName, param1, param2, param3);
+        // Create a modifiable copy of the line
+        char lineCopy[256];
+        strncpy(lineCopy, line, sizeof(lineCopy) - 1);
+        lineCopy[sizeof(lineCopy) - 1] = '\0';  // Ensure null termination
 
-        // If only one parameter was provided
-        if (paramCount == 2) {
-            // Define a function with one parameter
-            fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
+        // Tokenize the line, starting after "function"
+        char* token = strtok(lineCopy + 9, " ");
+        
+        // First token is the function name
+        strcpy(funcName, token);
+
+        // Collect parameters
+        while ((token = strtok(NULL, " ")) != NULL && paramCount < 10) {
+            params[paramCount++] = token;  // Store parameter names
         }
-        // If two parameters were provided
-        else if (paramCount == 3) {
-            // Define a function with two parameters
-            fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
-        } else if (paramCount == 4) {
-            // Define a function with two parameters
-            fprintf(outputFile, "void %s(double %s, double %s, double %s) {\n", funcName, param1, param2, param3);
+
+        // Handle function definition based on parameter count
+        fprintf(outputFile, "void %s(", funcName);
+        
+        if (paramCount == 0) {
+            // No parameters, just write void
+            fprintf(outputFile, "void");
         } else {
-            fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
-            exit(EXIT_FAILURE);
+            // Write parameters
+            for (int i = 0; i < paramCount; i++) {
+                if (i > 0) {
+                    fprintf(outputFile, ", ");
+                }
+                fprintf(outputFile, "double %s", params[i]);  // Write each parameter
+            }
         }
+
+        fprintf(outputFile, ") {\n");  // Finish the function definition
 
         FuncdefineCount++;
         return;
     }
-
 
     // Handle print statement inside a function
     if (strncmp(line, "\tprint", 6) == 0) {
@@ -189,6 +242,7 @@ void translateToC(FILE *outputFile, const char* line) {
             // If the variable is already declared, just assign the value
             fprintf(outputFile, "%s = %s;\n", var, expr);
         }
+        updateVariableDeclaration(var, false);  // Mark as undeclared
         return;
     }
 
