@@ -79,15 +79,17 @@ void declareVariable(const char* var) {
 
 // Correct the function to handle function calls and fix the um(12, 6) error
 void translateToC(FILE *outputFile, const char* line) {
-    // Skip comments that start with '#'
-    if (strncmp(line, "#", 1) == 0) {
-        fprintf(outputFile, "// %s\n", line + 1);  // Write comment to C file, excluding the '#' character
-        return;
-    }
     if (strncmp(line, "\n", 1) == 0){
         fprintf(outputFile, "\n");  // Write comment to C file, excluding the new line character
         return;
     }
+
+    // Check if there is a '#' and ignore everything after it
+    char* commentPos = strchr(line, '#');
+    if (commentPos != NULL) {
+        *commentPos = '\0';  // Truncate the line at '#'
+    }
+
     
     // Handle function definition
     if (strncmp(line, "function", 8) == 0) {
@@ -372,7 +374,8 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
     // Check if there is a return statement
     if (strstr(funcDefLine, "return") != NULL) {
         returnExists = true;
-        break;  // Found a return, no need to continue checking
+        printf("return found. functionOpen set to false.\n");
+        //break;  // Found a return, no need to continue checking
     }
 }
 fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
@@ -400,9 +403,11 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
             if (returnExists) {
                 strcat(temp, "double");
                 printf("Found return. Changing void to double.\n");
+                
             } else {
                 strcat(temp, "void");  // Keep it as void
                 printf("No return. Keeping void.\n");
+                
             }
 
             // Concatenate the remaining part of the line after "void"
@@ -418,8 +423,8 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
     } else {
         // Handle other lines (e.g., inside the function)
         fputs(funcDefLine, cFile);
-        returnExists = false;
     }
+    returnExists = false;
 }
 
 // Ensure that any remaining open function block is closed
@@ -427,6 +432,12 @@ if (functionOpen) {
     fprintf(cFile, "}\n");
     printf("Closing final function. functionOpen set to false.\n");
     functionOpen = false;
+    if (!functionOpen)
+    {
+       returnExists = false;
+    }
+    
+    returnExists = false;
 }
 
 
