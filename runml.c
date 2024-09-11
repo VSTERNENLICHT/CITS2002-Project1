@@ -1,3 +1,10 @@
+//  CITS2002 Project 1 2024
+//  Student1:   23902644   Seoyoung Park
+//  Student2:   23915299   Harper Chen
+//  Platform:   Apple
+
+// Compile this program with: cc -std=c11 -Wall -Werror -o runml runml.c
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +41,7 @@ bool isValidSyntax(const char* line) {
     if (strncmp(line, "\tprint", 6) == 0) return true;
 
     if (strncmp(line, "return", 6) == 0) return true;
-    if (strncmp(line, "\treturn", 7) == 0) return true;
+    if (strncmp(line, "\treturn",7) == 0) return true;
     if (strncmp(line, "\0", 1) == 0) return true;
 
     // Check if it is an assignment "<-"
@@ -47,7 +54,6 @@ bool isValidSyntax(const char* line) {
     return false;
 }
 
-
 // Update the variable declaration status
 void updateVariableDeclaration(const char* var, bool declaredStatus) {
     for (int i = 0; i < varCount; i++) {
@@ -57,6 +63,7 @@ void updateVariableDeclaration(const char* var, bool declaredStatus) {
         }
     }
 }
+
 // Check if a variable has been declared before
 bool isVariableDeclared(const char* var) {
     for (int i = 0; i < varCount; i++) {
@@ -87,48 +94,33 @@ void translateToC(FILE *outputFile, const char* line) {
         *commentPos = '\0';  // Truncate the line at '#'
     }
 
+    
     // Handle function definition
     if (strncmp(line, "function", 8) == 0) {
         char funcName[50];
-        char* params[10];  // Assuming a maximum of 10 parameters
-        int paramCount = 0;
+        char params[5][50] = {{""}};  // Array to store up to 5 parameters
+        int paramCount = sscanf(line, "function %s %s %s %s %s", funcName, params[0], params[1], params[2], params[3]);
 
-        // Create a modifiable copy of the line
-        char lineCopy[256];
-        strncpy(lineCopy, line, sizeof(lineCopy) - 1);
-        lineCopy[sizeof(lineCopy) - 1] = '\0';  // Ensure null termination
-
-        // Tokenize the line, starting after "function"
-        char* token = strtok(lineCopy + 9, " ");
-        
-        // First token is the function name
-        strcpy(funcName, token);
-
-        // Collect parameters
-        while ((token = strtok(NULL, " ")) != NULL && paramCount < 10) {
-            params[paramCount++] = token;  // Store parameter names
-        }
-
-        // Handle function definition based on parameter count
-        fprintf(outputFile, "void %s(", funcName);
-        
-        if (paramCount == 0) {
-            // No parameters, just write void
-            fprintf(outputFile, "void");
-        } else if (paramCount > 0) {
-            // Write parameters
-            for (int i = 0; i < paramCount; i++) {
-                if (i > 0) {
-                    fprintf(outputFile, ", ");
-                }
-                fprintf(outputFile, "double %s", params[i]);  // Write each parameter
-            }
-        } else {
+        // Check for a valid number of parameters (function name + up to 4 parameters)
+        if (paramCount < 2 || paramCount > 5) {
             fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
             exit(EXIT_FAILURE);
         }
 
-        fprintf(outputFile, ") {\n");  // Finish the function definition
+        // Start writing the function definition
+        fprintf(outputFile, "void %s(", funcName);
+
+        // Write each parameter, separating with commas
+        for (int i = 1; i < paramCount; i++) {
+            if (i > 1) {
+                fprintf(outputFile, ", ");
+            }
+            fprintf(outputFile, "double %s", params[i - 1]);
+        }
+
+        // Close the function parameter list and add the function body opening brace
+        fprintf(outputFile, ") {\n");
+
         FuncdefineCount++;
         return;
     }
@@ -348,31 +340,38 @@ int main(int argc, char *argv[]) {
     // Move function definitions to the top of the file
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
     char funcDefLine[256];
-    bool returnExists = false;  // Track if there is a return statement in the function
     bool functionOpen = false;  // Track if a function block is open
 
-    // First, read through the function definitions to check if there is a return statement
+    // Process each line in the function definitions file
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
-        // Check if there is a return statement
-        if (strstr(funcDefLine, "return") != NULL) {
-            returnExists = true;
-            break;  // Found a return, no need to continue checking
-        }
-    }
+        bool returnExistsInside = false;  // Local flag for return within a specific function
 
-    fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
-    while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         // Check if we have reached a new function definition
         if (strstr(funcDefLine, "void") != NULL) {
             // If a function is already open, close it
             if (functionOpen) {
                 fprintf(cFile, "}\n");  // Close the previous function
-                printf("Closing function. functionOpen set to false.\n");
                 functionOpen = false;
             }
-            
+
             // Now handle the new function definition
             char *pos = strstr(funcDefLine, "void");
+
+            // Check if the current function contains a return statement by scanning ahead
+            long currentPos = ftell(funcDefFile);  // Save the current position in the file
+            char checkLine[256];
+            while (fgets(checkLine, sizeof(checkLine), funcDefFile)) {
+                if (strstr(checkLine, "return") != NULL) {
+                    returnExistsInside = true;
+                    break;  // No need to continue checking once a return is found
+                }
+                // Break if another function definition starts
+                if (strstr(checkLine, "void") != NULL) {
+                    break;
+                }
+            }
+            fseek(funcDefFile, currentPos, SEEK_SET);  // Restore the position to continue normal processing
+
             if (pos != NULL) {
                 // Create a temporary buffer for the modified line
                 char temp[256];
@@ -380,13 +379,11 @@ int main(int argc, char *argv[]) {
                 strncpy(temp, funcDefLine, pos - funcDefLine);
                 temp[pos - funcDefLine] = '\0';  // Null-terminate the string
 
-                // If the function contains a return statement, change "void" to "double"
-                if (returnExists) {
+                // If the current function contains a return statement, change "void" to "double"
+                if (returnExistsInside) {
                     strcat(temp, "double");
-                    printf("Found return. Changing void to double.\n");
                 } else {
                     strcat(temp, "void");  // Keep it as void
-                    printf("No return. Keeping void.\n");
                 }
 
                 // Concatenate the remaining part of the line after "void"
@@ -397,20 +394,16 @@ int main(int argc, char *argv[]) {
 
                 // Set the functionOpen flag to true, indicating an open function block
                 functionOpen = true;
-                printf("Opening function. functionOpen set to true.\n");
             }
         } else {
             // Handle other lines (e.g., inside the function)
             fputs(funcDefLine, cFile);
-            returnExists = false;
         }
     }
 
     // Ensure that any remaining open function block is closed
     if (functionOpen) {
         fprintf(cFile, "}\n");
-        printf("Closing final function. functionOpen set to false.\n");
-        functionOpen = false;
     }
 
     // Write the main function header
@@ -438,7 +431,7 @@ int main(int argc, char *argv[]) {
     runExecutable(cFileName);
 
     // Remove the compiled and c file
-    // cleanUpFiles(cFileName, pid);
+    cleanUpFiles(cFileName, pid);
 
     exit(EXIT_SUCCESS);
 }
