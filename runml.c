@@ -102,7 +102,7 @@ void translateToC(FILE *outputFile, const char* line) {
         int paramCount = sscanf(line, "function %s %s %s %s %s", funcName, params[0], params[1], params[2], params[3]);
 
         // Check for a valid number of parameters (function name + up to 4 parameters)
-        if (paramCount < 2 || paramCount > 5) {
+        if (paramCount > 5) {
             fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
             exit(EXIT_FAILURE);
         }
