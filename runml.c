@@ -34,7 +34,7 @@ bool isValidSyntax(const char* line) {
     if (strncmp(line, "\tprint", 6) == 0) return true;
 
     if (strncmp(line, "return", 6) == 0) return true;
-    if (strncmp(line, "\treturn",7) == 0) return true;
+    if (strncmp(line, "\treturn", 7) == 0) return true;
     if (strncmp(line, "\0", 1) == 0) return true;
 
     // Check if it is an assignment "<-"
@@ -129,7 +129,6 @@ void translateToC(FILE *outputFile, const char* line) {
         }
 
         fprintf(outputFile, ") {\n");  // Finish the function definition
-
         FuncdefineCount++;
         return;
     }
@@ -360,8 +359,8 @@ int main(int argc, char *argv[]) {
             break;  // Found a return, no need to continue checking
         }
     }
-    fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
 
+    fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
     while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         // Check if we have reached a new function definition
         if (strstr(funcDefLine, "void") != NULL) {
