@@ -98,7 +98,7 @@ void translateToC(FILE *outputFile, const char* line) {
     // Handle function definition
     if (strncmp(line, "function", 8) == 0) {
         char funcName[50];
-        char params[5][50] = {{""}};  // Array to store up to 5 parameters
+        char params[5][50] = {{""}};  // Array to store up to 5 parameters (function name + 4 parameters)
         int paramCount = sscanf(line, "function %s %s %s %s %s", funcName, params[0], params[1], params[2], params[3]);
 
         // Check for a valid number of parameters (function name + up to 4 parameters)
