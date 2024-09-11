@@ -74,9 +74,6 @@ void declareVariable(const char* var) {
     varCount++;
 }
 
-
-
-
 // Correct the function to handle function calls and fix the um(12, 6) error
 void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "\n", 1) == 0){
@@ -92,35 +89,35 @@ void translateToC(FILE *outputFile, const char* line) {
 
     
     // Handle function definition
-    if (strncmp(line, "function", 8) == 0) {
-        char funcName[50];
-        char param1[50] = "";  // First parameter
-        char param2[50] = "";  // Second parameter, might be empty if not provided
-        char param3[50] = "";  // Third parameter, might be empty if not provided
+if (strncmp(line, "function", 8) == 0) {
+    char funcName[50];
+    char params[5][50] = {{""}};  // Array to store up to 5 parameters
+    int paramCount = sscanf(line, "function %s %s %s %s %s", funcName, params[0], params[1], params[2], params[3]);
 
-        // Parse the function name and parameters (assuming a maximum of 2 parameters)
-        int paramCount = sscanf(line, "function %s %s %s %s", funcName, param1, param2, param3);
-
-        // If only one parameter was provided
-        if (paramCount == 2) {
-            // Define a function with one parameter
-            fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
-        }
-        // If two parameters were provided
-        else if (paramCount == 3) {
-            // Define a function with two parameters
-            fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
-        } else if (paramCount == 4) {
-            // Define a function with two parameters
-            fprintf(outputFile, "void %s(double %s, double %s, double %s) {\n", funcName, param1, param2, param3);
-        } else {
-            fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
-            exit(EXIT_FAILURE);
-        }
-
-        FuncdefineCount++;
-        return;
+    // Check for a valid number of parameters (function name + up to 4 parameters)
+    if (paramCount < 2 || paramCount > 5) {
+        fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+        exit(EXIT_FAILURE);
     }
+
+    // Start writing the function definition
+    fprintf(outputFile, "void %s(", funcName);
+
+    // Write each parameter, separating with commas
+    for (int i = 1; i < paramCount; i++) {
+        if (i > 1) {
+            fprintf(outputFile, ", ");
+        }
+        fprintf(outputFile, "double %s", params[i - 1]);
+    }
+
+    // Close the function parameter list and add the function body opening brace
+    fprintf(outputFile, ") {\n");
+
+    FuncdefineCount++;
+    return;
+}
+
 
 
     // Handle print statement inside a function
@@ -366,21 +363,12 @@ int main(int argc, char *argv[]) {
 // Move function definitions to the top of the file
 fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
 char funcDefLine[256];
-bool returnExists = false;  // Track if there is a return statement in the function
 bool functionOpen = false;  // Track if a function block is open
 
-// First, read through the function definitions to check if there is a return statement
+// Process each line in the function definitions file
 while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
-    // Check if there is a return statement
-    if (strstr(funcDefLine, "return") != NULL) {
-        returnExists = true;
-        printf("return found. functionOpen set to false.\n");
-        //break;  // Found a return, no need to continue checking
-    }
-}
-fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
+    bool returnExistsInside = false;  // Local flag for return within a specific function
 
-while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
     // Check if we have reached a new function definition
     if (strstr(funcDefLine, "void") != NULL) {
         // If a function is already open, close it
@@ -389,9 +377,25 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
             printf("Closing function. functionOpen set to false.\n");
             functionOpen = false;
         }
-        
+
         // Now handle the new function definition
         char *pos = strstr(funcDefLine, "void");
+
+        // Check if the current function contains a return statement by scanning ahead
+        long currentPos = ftell(funcDefFile);  // Save the current position in the file
+        char checkLine[256];
+        while (fgets(checkLine, sizeof(checkLine), funcDefFile)) {
+            if (strstr(checkLine, "return") != NULL) {
+                returnExistsInside = true;
+                break;  // No need to continue checking once a return is found
+            }
+            // Break if another function definition starts
+            if (strstr(checkLine, "void") != NULL) {
+                break;
+            }
+        }
+        fseek(funcDefFile, currentPos, SEEK_SET);  // Restore the position to continue normal processing
+
         if (pos != NULL) {
             // Create a temporary buffer for the modified line
             char temp[256];
@@ -399,15 +403,13 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
             strncpy(temp, funcDefLine, pos - funcDefLine);
             temp[pos - funcDefLine] = '\0';  // Null-terminate the string
 
-            // If the function contains a return statement, change "void" to "double"
-            if (returnExists) {
+            // If the current function contains a return statement, change "void" to "double"
+            if (returnExistsInside) {
                 strcat(temp, "double");
-                printf("Found return. Changing void to double.\n");
-                
+                printf("Function contains return. Changing void to double.\n");
             } else {
                 strcat(temp, "void");  // Keep it as void
-                printf("No return. Keeping void.\n");
-                
+                printf("No return in function. Keeping void.\n");
             }
 
             // Concatenate the remaining part of the line after "void"
@@ -424,29 +426,13 @@ while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
         // Handle other lines (e.g., inside the function)
         fputs(funcDefLine, cFile);
     }
-    returnExists = false;
 }
 
 // Ensure that any remaining open function block is closed
 if (functionOpen) {
     fprintf(cFile, "}\n");
     printf("Closing final function. functionOpen set to false.\n");
-    functionOpen = false;
-    if (!functionOpen)
-    {
-       returnExists = false;
-    }
-    
-    returnExists = false;
 }
-
-
-    // // After writing all function definitions, only close the function with `}` if we wrote any definitions
-    // if (hasFunctionDefinitions) {
-    //     fprintf(cFile, "}\n");
-    //     hasFunctionDefinitions = false;
-    // }
-    
 
     // Write the main function header
     fprintf(cFile, "int main() {\n");
