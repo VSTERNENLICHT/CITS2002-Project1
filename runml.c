@@ -15,6 +15,8 @@ typedef struct {
 // Declare an array to store variables
 Variable variables[50];
 int varCount = 0;
+// Track the number of open function blocks
+int FuncdefineCount = 0;
 
 // Check if the file extension is .ml
 bool checkFileExtension(const char* filePath) {
@@ -33,6 +35,7 @@ bool isValidSyntax(const char* line) {
 
     if (strncmp(line, "return", 6) == 0) return true;
     if (strncmp(line, "\treturn",7) == 0) return true;
+    if (strncmp(line, "\0", 1) == 0) return true;
 
     // Check if it is an assignment "<-"
     if (strstr(line, "<-") != NULL) return true;
@@ -64,35 +67,41 @@ void declareVariable(const char* var) {
 // Correct the function to handle function calls and fix the um(12, 6) error
 void translateToC(FILE *outputFile, const char* line) {
     // Skip comments that start with '#'
-    if (line[0] == '#') {
+    if (strncmp(line, "#", 1) == 0) {
         fprintf(outputFile, "// %s\n", line + 1);  // Write comment to C file, excluding the '#' character
         return;
     }
-
+    if (strncmp(line, "\n", 1) == 0){
+        fprintf(outputFile, "\n");  // Write comment to C file, excluding the new line character
+        return;
+    }
+    
     // Handle function definition
-if (strncmp(line, "function", 8) == 0) {
-    char funcName[50];
-    char param1[50] = "";  // First parameter
-    char param2[50] = "";  // Second parameter, might be empty if not provided
+    if (strncmp(line, "function", 8) == 0) {
+        char funcName[50];
+        char param1[50] = "";  // First parameter
+        char param2[50] = "";  // Second parameter, might be empty if not provided
 
-    // Parse the function name and parameters (assuming a maximum of 2 parameters)
-    int paramCount = sscanf(line, "function %s %s %s", funcName, param1, param2);
+        // Parse the function name and parameters (assuming a maximum of 2 parameters)
+        int paramCount = sscanf(line, "function %s %s %s", funcName, param1, param2);
 
-    // If only one parameter was provided
-    if (paramCount == 2) {
-        // Define a function with one parameter
-        fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
+        // If only one parameter was provided
+        if (paramCount == 2) {
+            // Define a function with one parameter
+            fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
+        }
+        // If two parameters were provided
+        else if (paramCount == 3) {
+            // Define a function with two parameters
+            fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
+        } else {
+            fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+            exit(EXIT_FAILURE);
+        }
+
+        FuncdefineCount++;
+        return;
     }
-    // If two parameters were provided
-    else if (paramCount == 3) {
-        // Define a function with two parameters
-        fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
-    } else {
-        fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
-        exit(EXIT_FAILURE);
-    }
-    return;
-}
 
 
     // Handle print statement inside a function
@@ -122,48 +131,50 @@ if (strncmp(line, "function", 8) == 0) {
         return;
     }
 
-        // Handle print statement
-    if (strncmp(line, "return", 6) == 0) {
-        char expression[200];
-        sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
+    //     // Handle print statement
+    // if (strncmp(line, "return", 6) == 0) {
+    //     char expression[200];
+    //     sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
 
-        // Print the expression, check if it's an integer
-        fprintf(outputFile,
-            "return %s;\n", expression);
-        return;
-    }
+    //     // Print the expression, check if it's an integer
+    //     fprintf(outputFile,
+    //         "return %s;\n", expression);
+    //     return;
+    // }
+
+    // // Handle return statement inside a function
+    // if (strncmp(line, "\treturn", 7) == 0) {
+    //     char expression[200];
+    //     sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'print'
+
+    //     // Print the expression, check if it's an integer
+    //     fprintf(outputFile,
+    //         "\treturn %s;\n", expression);
+    //     return;
+    // }
 
     // Handle return statement inside a function
-    if (strncmp(line, "\treturn", 7) == 0) {
+    if (strncmp(line, "\treturn", 7) == 0 || strncmp(line, "return", 6) == 0) {
         char expression[200];
-        sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'print'
-
-        // Print the expression, check if it's an integer
-        fprintf(outputFile,
-            "\treturn %s;\n", expression);
-        return;
-    }
-
-    // Handle function call and ensure it is properly parsed
-    if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
-        char funcCall[200];
-        sscanf(line, "%[^\n]", funcCall);  // Extract the function call
-        // Clean up spaces around parentheses in function calls (fix the 'um' issue)
-        char cleanFuncCall[200];
-        int i = 0, j = 0;
-        while (funcCall[i] != '\0') {
-            if (funcCall[i] != ' ' || (i > 0 && funcCall[i - 1] != '(' && funcCall[i - 1] != ')')) {
-                cleanFuncCall[j++] = funcCall[i];
-            }
-            i++;
+        
+        // Differentiate between indented and non-indented return statements
+        if (line[0] == '\t') {
+            sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'return'
+        } else {
+            sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'return'
         }
-        cleanFuncCall[j] = '\0';
-        fprintf(outputFile, "%s;\n", cleanFuncCall);  // Write cleaned function call to C file
+
+        // Print the return statement
+        fprintf(outputFile, "\treturn %s;\n", expression);
+
+        // Now add the closing brace '}' right after the return statement
+       // fprintf(outputFile, "}\n");
+
         return;
     }
 
     // Handle assignment statement
-    else if (strstr(line, "<-") != NULL) {
+    if (strstr(line, "<-") != NULL) {
         char var[50], expr[200];
         sscanf(line, "%s <- %[^\n]", var, expr);  // Extract the variable and expression
         // If the variable hasn't been declared, declare it as a double
@@ -177,7 +188,7 @@ if (strncmp(line, "function", 8) == 0) {
         return;
     }
 
-    // Handle end of function block
+    //Handle end of function block
     if (strncmp(line, "end", 3) == 0) {
         fprintf(outputFile, "}\n");  // Close function block in C
         return;
@@ -194,9 +205,7 @@ void compileCFile(const char* cFileName, int pid) {
     char command[256];
     snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
-    if (result == 0) {
-        printf("C code compiled successfully!\n");  // Should be removed before submission
-    } else {
+    if (result != 0) {
         fprintf(stderr, "Error during compilation!\n"); // Should be modified before submission
         exit(EXIT_FAILURE);
     }
@@ -227,8 +236,6 @@ void cleanUpFiles(const char* cFileName, int pid) {
     int removeCFileStatus = system(removeCFile);
     if (removeCFileStatus != 0) {
         fprintf(stderr, "Error removing the generated C file: %s\n", cFileName);
-    } else {
-        printf("Successfully removed the generated C file: %s.c\n", cFileName); // REMOVE BEFORE SUBMIT
     }
 
     // Remove the executable
@@ -237,8 +244,6 @@ void cleanUpFiles(const char* cFileName, int pid) {
     int removeExecStatus = system(removeExecutable);
     if (removeExecStatus != 0) {
         fprintf(stderr, "Error removing the compiled executable: ml-%d\n", pid);
-    } else {
-        printf("Successfully removed the compiled executable: ml-%d\n", pid);   // REMOVE BEFORE SUBMIT
     }
 }
 
@@ -275,8 +280,6 @@ int main(int argc, char *argv[]) {
     FILE *funcDefFile = tmpfile();  // Create a temporary file to store function definitions
 
     FILE *upperFuncFile = tmpfile();    // Create a temporary file to store lines before function
-
-    // FILE *tmpUpperFile =tmpfile();  // To store upper lines if there is function
 
     bool funcExists = false;    // Checks if lines for the main statement has been read
 
@@ -340,51 +343,63 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Move function definitions to the top of the file
-    fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
-    char funcDefLine[256];
-    bool returnExists = false;
-    bool hasFunctionDefinitions = false;  // Flag to track if any function definitions were written
+// Move function definitions to the top of the file
+fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
+char funcDefLine[256];
 
-    // First, read through the function definitions to check if there is a return statement
-    while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
-        hasFunctionDefinitions = true;  // Mark that we have function definitions
-        if (strstr(funcDefLine, "return") != NULL) {
-            returnExists = true;
-            break;
-        }
-    }
-    fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile again
-    while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
-        if (returnExists) {
-            
-        // Check if "void" exists in the current line
-            if (strstr(funcDefLine, "void") != NULL) {
-                // Replace "void" with "double"
-                char *pos = strstr(funcDefLine, "void");
-                if (pos != NULL) {
-                    // Create a temporary buffer for the modified line
-                    char temp[256];
-                    // Copy the part of the line before "void"
-                    strncpy(temp, funcDefLine, pos - funcDefLine);
-                    temp[pos - funcDefLine] = '\0';  // Null-terminate the string
-                    
-                    // Concatenate "double" and the remaining part of the line after "void"
-                    strcat(temp, "double");
-                    strcat(temp, pos + 4);  // Skip 4 characters ("void")
+bool functionOpen = false;  // Track if a function block is open
 
-                    // Copy the modified line back into funcDefLine
-                    strcpy(funcDefLine, temp);
-                }
-            }
+while (fgets(funcDefLine, sizeof(funcDefLine), funcDefFile)) {
+    // Check if we have reached a new function definition
+    if (strstr(funcDefLine, "void") != NULL) {
+        // If a function is already open, close it
+        if (functionOpen) {
+            fprintf(cFile, "}\n");  // Close the previous function
+            printf("Closing function. functionOpen set to false.\n");  // Print the flag state
+            functionOpen = false;   // Reset the flag
         }
-        // Write the (possibly modified) line into the cFile
+        
+        // Now, handle the new function definition
+        // Replace "void" with "double" as necessary
+        char *pos = strstr(funcDefLine, "void");
+        if (pos != NULL) {
+            // Create a temporary buffer for the modified line
+            char temp[256];
+            // Copy the part of the line before "void"
+            strncpy(temp, funcDefLine, pos - funcDefLine);
+            temp[pos - funcDefLine] = '\0';  // Null-terminate the string
+
+            // Concatenate "double" and the remaining part of the line after "void"
+            strcat(temp, "double");
+            strcat(temp, pos + 4);  // Skip 4 characters ("void")
+
+            // Write the modified function definition to the C file
+            fputs(temp, cFile);
+
+            // Set the functionOpen flag to true, indicating an open function block
+            functionOpen = true;
+            printf("Opening function. functionOpen set to true.\n");  // Print the flag state
+        }
+    } else {
+        // Handle other lines (e.g., inside the function)
         fputs(funcDefLine, cFile);
     }
-    // After writing all function definitions, only close the function with `}` if we wrote any definitions
-    if (hasFunctionDefinitions) {
-        fprintf(cFile, "}\n");
-    }
+}
+
+// Ensure that any remaining open function block is closed
+if (functionOpen) {
+    fprintf(cFile, "}\n");
+    printf("Closing final function. functionOpen set to false.\n");  // Print the flag state
+    functionOpen = false;
+}
+
+    
+
+    // // After writing all function definitions, only close the function with `}` if we wrote any definitions
+    // if (hasFunctionDefinitions) {
+    //     fprintf(cFile, "}\n");
+    //     hasFunctionDefinitions = false;
+    // }
     
 
     // Write the main function header
