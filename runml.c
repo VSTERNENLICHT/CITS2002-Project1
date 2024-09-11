@@ -47,6 +47,16 @@ bool isValidSyntax(const char* line) {
     return false;
 }
 
+
+// Update the variable declaration status
+void updateVariableDeclaration(const char* var, bool declaredStatus) {
+    for (int i = 0; i < varCount; i++) {
+        if (strcmp(variables[i].name, var) == 0) {
+            variables[i].declared = declaredStatus;  // Update the declared status
+            return;
+        }
+    }
+}
 // Check if a variable has been declared before
 bool isVariableDeclared(const char* var) {
     for (int i = 0; i < varCount; i++) {
@@ -63,6 +73,9 @@ void declareVariable(const char* var) {
     variables[varCount].declared = true;
     varCount++;
 }
+
+
+
 
 // Correct the function to handle function calls and fix the um(12, 6) error
 void translateToC(FILE *outputFile, const char* line) {
@@ -81,9 +94,10 @@ void translateToC(FILE *outputFile, const char* line) {
         char funcName[50];
         char param1[50] = "";  // First parameter
         char param2[50] = "";  // Second parameter, might be empty if not provided
+        char param3[50] = "";  // Third parameter, might be empty if not provided
 
         // Parse the function name and parameters (assuming a maximum of 2 parameters)
-        int paramCount = sscanf(line, "function %s %s %s", funcName, param1, param2);
+        int paramCount = sscanf(line, "function %s %s %s %s", funcName, param1, param2, param3);
 
         // If only one parameter was provided
         if (paramCount == 2) {
@@ -94,6 +108,9 @@ void translateToC(FILE *outputFile, const char* line) {
         else if (paramCount == 3) {
             // Define a function with two parameters
             fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
+        } else if (paramCount == 4) {
+            // Define a function with two parameters
+            fprintf(outputFile, "void %s(double %s, double %s, double %s) {\n", funcName, param1, param2, param3);
         } else {
             fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
             exit(EXIT_FAILURE);
@@ -185,6 +202,7 @@ void translateToC(FILE *outputFile, const char* line) {
             // If the variable is already declared, just assign the value
             fprintf(outputFile, "%s = %s;\n", var, expr);
         }
+        updateVariableDeclaration(var, false);  // Mark as undeclared
         return;
     }
 
