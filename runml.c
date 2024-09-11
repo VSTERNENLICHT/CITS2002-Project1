@@ -76,46 +76,16 @@ void declareVariable(const char* var) {
 
 // Correct the function to handle function calls and fix the um(12, 6) error
 void translateToC(FILE *outputFile, const char* line) {
-    // Skip comments that start with '#'
-    if (strncmp(line, "#", 1) == 0) {
-        fprintf(outputFile, "// %s\n", line + 1);  // Write comment to C file, excluding the '#' character
-        return;
-    }
     if (strncmp(line, "\n", 1) == 0){
         fprintf(outputFile, "\n");  // Write comment to C file, excluding the new line character
         return;
     }
     
-    // // Handle function definition
-    // if (strncmp(line, "function", 8) == 0) {
-    //     char funcName[50];
-    //     char param1[50] = "";  // First parameter
-    //     char param2[50] = "";  // Second parameter, might be empty if not provided
-    //     char param3[50] = "";  // Third parameter, might be empty if not provided
-
-    //     // Parse the function name and parameters (assuming a maximum of 2 parameters)
-    //     int paramCount = sscanf(line, "function %s %s %s %s", funcName, param1, param2, param3);
-
-    //     // If only one parameter was provided
-    //     if (paramCount == 2) {
-    //         // Define a function with one parameter
-    //         fprintf(outputFile, "void %s(double %s) {\n", funcName, param1);
-    //     }
-    //     // If two parameters were provided
-    //     else if (paramCount == 3) {
-    //         // Define a function with two parameters
-    //         fprintf(outputFile, "void %s(double %s, double %s) {\n", funcName, param1, param2);
-    //     } else if (paramCount == 4) {
-    //         // Define a function with two parameters
-    //         fprintf(outputFile, "void %s(double %s, double %s, double %s) {\n", funcName, param1, param2, param3);
-    //     } else {
-    //         fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
-    //         exit(EXIT_FAILURE);
-    //     }
-
-    //     FuncdefineCount++;
-    //     return;
-    // }
+    // Check if there is a '#' and ignore everything after it
+    char* commentPos = strchr(line, '#');
+    if (commentPos != NULL) {
+        *commentPos = '\0';  // Truncate the line at '#'
+    }
 
     // Handle function definition
     if (strncmp(line, "function", 8) == 0) {
@@ -145,7 +115,7 @@ void translateToC(FILE *outputFile, const char* line) {
         if (paramCount == 0) {
             // No parameters, just write void
             fprintf(outputFile, "void");
-        } else {
+        } else if (paramCount > 0) {
             // Write parameters
             for (int i = 0; i < paramCount; i++) {
                 if (i > 0) {
@@ -153,6 +123,9 @@ void translateToC(FILE *outputFile, const char* line) {
                 }
                 fprintf(outputFile, "double %s", params[i]);  // Write each parameter
             }
+        } else {
+            fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+            exit(EXIT_FAILURE);
         }
 
         fprintf(outputFile, ") {\n");  // Finish the function definition
@@ -166,7 +139,6 @@ void translateToC(FILE *outputFile, const char* line) {
         char expression[200];
         sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
         // Print the expression inside the function
-        // fprintf(outputFile, "\tprintf(\"%%.6f\\n\", (double)(%s));\n", expression);
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "} else {\n");
@@ -179,7 +151,6 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "print ", 6) == 0) {
         char expression[200];
         sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
-        // fprintf(outputFile, "printf(\"%%.6f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "} else {\n");
@@ -187,28 +158,6 @@ void translateToC(FILE *outputFile, const char* line) {
         fprintf(outputFile, "}\n");
         return;
     }
-
-    //     // Handle print statement
-    // if (strncmp(line, "return", 6) == 0) {
-    //     char expression[200];
-    //     sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
-
-    //     // Print the expression, check if it's an integer
-    //     fprintf(outputFile,
-    //         "return %s;\n", expression);
-    //     return;
-    // }
-
-    // // Handle return statement inside a function
-    // if (strncmp(line, "\treturn", 7) == 0) {
-    //     char expression[200];
-    //     sscanf(line + 8, "%[^\n]", expression);  // Extract everything after 'print'
-
-    //     // Print the expression, check if it's an integer
-    //     fprintf(outputFile,
-    //         "\treturn %s;\n", expression);
-    //     return;
-    // }
 
     // Handle return statement inside a function
     if (strncmp(line, "\treturn", 7) == 0 || strncmp(line, "return", 6) == 0) {
@@ -223,10 +172,6 @@ void translateToC(FILE *outputFile, const char* line) {
 
         // Print the return statement
         fprintf(outputFile, "\treturn %s;\n", expression);
-
-        // Now add the closing brace '}' right after the return statement
-       // fprintf(outputFile, "}\n");
-
         return;
     }
 
@@ -468,14 +413,6 @@ if (functionOpen) {
     printf("Closing final function. functionOpen set to false.\n");
     functionOpen = false;
 }
-
-
-    // // After writing all function definitions, only close the function with `}` if we wrote any definitions
-    // if (hasFunctionDefinitions) {
-    //     fprintf(cFile, "}\n");
-    //     hasFunctionDefinitions = false;
-    // }
-    
 
     // Write the main function header
     fprintf(cFile, "int main() {\n");
