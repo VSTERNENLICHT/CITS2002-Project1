@@ -100,7 +100,7 @@ void translateToC(FILE *outputFile, const char* line) {
             exit(EXIT_FAILURE);
         }
 
-        fprintf(outputFile, "void %s(", funcName);          // Write the function definition
+        fprintf(outputFile, "void %s(", funcName);  // Write the function definition
 
         // Write each parameter, separating with commas
         for (int i = 1; i < paramCount; i++) {
@@ -163,8 +163,8 @@ void translateToC(FILE *outputFile, const char* line) {
         if (!isVariableDeclared(var)) {
             fprintf(outputFile, "double %s = %s;\n", var, expr);
             declareVariable(var);
+        // If the variable is already declared, just assign the value
         } else {
-            // If the variable is already declared, just assign the value
             fprintf(outputFile, "%s = %s;\n", var, expr);
         }
         updateVariableDeclaration(var, false);  // Mark as undeclared
@@ -248,14 +248,14 @@ void processUpperFuncFile(FILE *inputFile, FILE *outputFile, FILE *mainFuncFile,
             char *pos = strstr(line, "void");
             if (pos != NULL) {
                 char temp[256]; // Create a temporary buffer for the modified line
-                strncpy(temp, line, pos - line);      // Copy the part of the line before "void"
+                strncpy(temp, line, pos - line);  // Copy the part of the line before "void"
                 temp[pos - line] = '\0';  // Null-terminate the string
                 
                 // Concatenate "double" and the remaining part of the line after "void"
                 strcat(temp, "double");
                 strcat(temp, pos + 4);  // Skip 4 characters ("void")
 
-                strcpy(line, temp);    // Copy the modified line back into line
+                strcpy(line, temp);  // Copy the modified line back into line
             }
         }
         // Write the possibly modified line into the appropriate file
@@ -376,12 +376,12 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
 
 
 int main(int argc, char *argv[]) {
-    if (argc != 2 || !checkFileExtension(argv[1])) {    // Check the file extension is .ml
+    if (argc != 2 || !checkFileExtension(argv[1])) { // Check the file extension is .ml
         fprintf(stderr, "Usage: %s program.ml\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    FILE *file = fopen(argv[1], "r");   // Open .ml file
+    FILE *file = fopen(argv[1], "r");  // Open .ml file
     if (!file) {
         fprintf(stderr, "Error opening file %s\n", argv[1]);
         exit(EXIT_FAILURE);
@@ -391,18 +391,18 @@ int main(int argc, char *argv[]) {
     char cFileName[50];
     snprintf(cFileName, sizeof(cFileName), "ml-%d.c", pid);
 
-    FILE *cFile = fopen(cFileName, "w");    // Open a C file to write the translated C code
+    FILE *cFile = fopen(cFileName, "w");  // Open a C file to write the translated C code
     if (!cFile) {
         fprintf(stderr, "Error creating C file\n");
         exit(EXIT_FAILURE);
     }
 
-    fprintf(cFile, "#include <stdio.h>\n\n");   // Write standard headers for the C code
+    fprintf(cFile, "#include <stdio.h>\n\n");  // Write standard headers for the C code
 
     FILE *mainFuncFile = tmpfile();  // Create a temporary file to store main function body
     FILE *funcDefFile = tmpfile();  // Create a temporary file to store function definitions
-    FILE *upperFuncFile = tmpfile();    // Create a temporary file to store lines before function
-    bool funcExists = false;    // Checks if lines for the main statement has been read
+    FILE *upperFuncFile = tmpfile();  // Create a temporary file to store lines before function
+    bool funcExists = false;  // Checks if lines for the main statement has been read
 
     // Read and process the .ml file line by line
     processFileLines(file, funcDefFile, upperFuncFile, mainFuncFile, cFile, &funcExists);
