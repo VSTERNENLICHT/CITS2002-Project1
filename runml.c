@@ -175,6 +175,25 @@ void translateToC(FILE *outputFile, const char* line) {
     if (isalpha(line[0])) {
         fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call
     }
+
+    // // Handle other expressions or function calls
+    // if (isalpha(line[0])) {
+    //     char var[50];
+    //     sscanf(line, "%s", var);  // Extract the first word (assumed to be a variable)
+
+    //     // If the variable hasn't been declared, initialize it with 0.0
+    //     if (!isVariableDeclared(var)) {
+    //         fprintf(outputFile, "double %s = 0.0;\n", var);
+    //         declareVariable(var);
+    //     }
+
+    //     // Skip any line that is just a variable name
+    //     if (strlen(var) > 0 && strcmp(line, var) == 0) {
+    //         return;  // Do nothing if the line is just a variable
+    //     }
+
+    //     fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call
+    // }
 }
 
 // Compile the generated C code
@@ -409,7 +428,7 @@ int main(int argc, char *argv[]) {
     processFunctionDefinitions(funcDefFile, cFile);
 
     // Write the main function header
-    fprintf(cFile, "int main() {\n");       
+    fprintf(cFile, "int main(int argc, char *argv[]) {\n");       
 
     // Write the main function body
     fseek(mainFuncFile, 0, SEEK_SET);  // Move to the beginning of the mainFuncFile
