@@ -4,8 +4,5 @@ function assignment
 	return y
 x <- 2.5 #test
 print x + assignment() # TEST
-x
-print x
-x <- 1
 l #cjdji
 print l

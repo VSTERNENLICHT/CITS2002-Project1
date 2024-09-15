@@ -171,29 +171,26 @@ void translateToC(FILE *outputFile, const char* line) {
         return;
     }
 
-    // Handle other expressions or function calls
-    if (isalpha(line[0])) {
-        fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call
+    // Handle function call
+    if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
+        fprintf(outputFile, "%s;\n", line);  // Treat as a function call
+        return;
     }
 
-    // // Handle other expressions or function calls
-    // if (isalpha(line[0])) {
-    //     char var[50];
-    //     sscanf(line, "%s", var);  // Extract the first word (assumed to be a variable)
+    // Handle other expressions or function calls
+    if (isalpha(line[0])) {
+        char var[50];
+        sscanf(line, "%s", var);  // Extract the first word (assumed to be a variable)
 
-    //     // If the variable hasn't been declared, initialize it with 0.0
-    //     if (!isVariableDeclared(var)) {
-    //         fprintf(outputFile, "double %s = 0.0;\n", var);
-    //         declareVariable(var);
-    //     }
+        // If the variable hasn't been declared, initialize it with 0.0
+        if (!isVariableDeclared(var)) {
+            fprintf(outputFile, "double %s = 0.0;\n", var);
+            declareVariable(var);
+            return;
+        }
 
-    //     // Skip any line that is just a variable name
-    //     if (strlen(var) > 0 && strcmp(line, var) == 0) {
-    //         return;  // Do nothing if the line is just a variable
-    //     }
-
-    //     fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call
-    // }
+        fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call or expression
+    }
 }
 
 // Compile the generated C code

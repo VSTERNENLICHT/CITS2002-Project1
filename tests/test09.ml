@@ -1,4 +1,4 @@
-# 10 is printed
+# 11 is printed
 #
 x <- 2
 y <- 3
