@@ -96,7 +96,7 @@ void translateToC(FILE *outputFile, const char* line) {
 
         // Check for a valid number of parameters (function name + up to 4 parameters)
         if (paramCount > 5) {
-            fprintf(stderr, "Error: Invalid function definition in line: %s\n", line);
+            fprintf(stderr, "!Error: Invalid function definition in line: %s\n", line);
             exit(EXIT_FAILURE);
         }
 
@@ -183,7 +183,7 @@ void compileCFile(const char* cFileName, int pid) {
     snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
     if (result != 0) {
-        fprintf(stderr, "Error during compilation!\n"); 
+        fprintf(stderr, "!Error during compilation!\n"); 
         exit(EXIT_FAILURE);
     }
 }
@@ -200,7 +200,7 @@ void runExecutable(char* cFileName) {
 
     int result = system(executableFile);  // Run the compiled executable
     if (result != 0) {
-        fprintf(stderr, "Error running the executable!\n"); 
+        fprintf(stderr, "!Error running the executable!\n"); 
         exit(EXIT_FAILURE);
     }
 }
@@ -212,7 +212,7 @@ void cleanUpFiles(const char* cFileName, int pid) {
     snprintf(removeCFile, sizeof(removeCFile), "rm -f %s.c", cFileName);  // -f flag forces removal
     int removeCFileStatus = system(removeCFile);
     if (removeCFileStatus != 0) {
-        fprintf(stderr, "Error removing the generated C file: %s\n", cFileName);
+        fprintf(stderr, "!Error removing the generated C file: %s\n", cFileName);
     }
 
     // Remove the executable
@@ -220,7 +220,7 @@ void cleanUpFiles(const char* cFileName, int pid) {
     snprintf(removeExecutable, sizeof(removeExecutable), "rm -f ml-%d", pid);
     int removeExecStatus = system(removeExecutable);
     if (removeExecStatus != 0) {
-        fprintf(stderr, "Error removing the compiled executable: ml-%d\n", pid);
+        fprintf(stderr, "!Error removing the compiled executable: ml-%d\n", pid);
     }
 }
 
@@ -358,7 +358,7 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
         } 
         // Handle syntax errors
         else {
-            fprintf(stderr, "Syntax error in line: %s\n", line);
+            fprintf(stderr, "!Syntax error in line: %s\n", line);
             fclose(file);
             fclose(cFile);
             fclose(funcDefFile);
@@ -370,13 +370,13 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
 
 int main(int argc, char *argv[]) {
     if (argc != 2 || !checkFileExtension(argv[1])) { // Check the file extension is .ml
-        fprintf(stderr, "Usage: %s program.ml\n", argv[0]);
+        fprintf(stderr, "!Usage: %s program.ml\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     FILE *file = fopen(argv[1], "r");  // Open .ml file
     if (!file) {
-        fprintf(stderr, "Error opening file %s\n", argv[1]);
+        fprintf(stderr, "!Error opening file %s\n", argv[1]);
         exit(EXIT_FAILURE);
     }
 
@@ -386,7 +386,7 @@ int main(int argc, char *argv[]) {
 
     FILE *cFile = fopen(cFileName, "w");  // Open a C file to write the translated C code
     if (!cFile) {
-        fprintf(stderr, "Error creating C file\n");
+        fprintf(stderr, "!Error creating C file\n");
         exit(EXIT_FAILURE);
     }
 
