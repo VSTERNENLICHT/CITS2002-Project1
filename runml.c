@@ -75,6 +75,31 @@ void declareVariable(const char* var) {
     varCount++;
 }
 
+void replaceArgWithArgv(char* expression) {
+    for (int i = 0; i < 10; i++) { // Maximum arg9 supported
+        char argPattern[10];
+        char argvPattern[20];
+
+        // Create the argN pattern (e.g., "arg0")
+        snprintf(argPattern, sizeof(argPattern), "arg%d", i);
+
+        // Create the argv[N] pattern (e.g., "argv[2]")
+        snprintf(argvPattern, sizeof(argvPattern), "atof(argv[%d])", i + 2);
+
+        // Replace all instances of argN with argv[N]
+        char *pos = strstr(expression, argPattern);
+        while (pos != NULL) {
+            char buffer[256];
+            strncpy(buffer, expression, pos - expression);  // Copy part before argN
+            buffer[pos - expression] = '\0';  // Null-terminate the string
+            strcat(buffer, argvPattern);  // Add argv[N]
+            strcat(buffer, pos + strlen(argPattern));  // Add rest of the expression
+            strcpy(expression, buffer);  // Copy the modified string back
+            pos = strstr(expression, argPattern);  // Search for the next occurrence
+        }
+    }
+}
+
 // Translate ml syntax into c syntax
 void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "\n", 1) == 0){
@@ -120,6 +145,8 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "\tprint", 6) == 0) {
         char expression[200];
         sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
+        replaceArgWithArgv(expression); // Replace argN with argv[N]
+
         // Print the expression inside the function
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
@@ -133,6 +160,8 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "print ", 6) == 0) {
         char expression[200];
         sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
+        replaceArgWithArgv(expression); // Replace argN with argv[N]
+
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "} else {\n");
@@ -151,21 +180,25 @@ void translateToC(FILE *outputFile, const char* line) {
             sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'return'
         }
 
+        replaceArgWithArgv(expression); // Replace argN with argv[N]
+
         fprintf(outputFile, "\treturn %s;\n", expression);  // Write the return statement
         return;
     }
 
     // Handle assignment statement
     if (strstr(line, "<-") != NULL) {
-        char var[50], expr[200];
-        sscanf(line, "%s <- %[^\n]", var, expr);  // Extract the variable and expression
+        char var[50], expression[200];
+        sscanf(line, "%s <- %[^\n]", var, expression);  // Extract the variable and expression
+        replaceArgWithArgv(expression); // Replace argN with argv[N]
+
         // If the variable hasn't been declared, declare it as a double
         if (!isVariableDeclared(var)) {
-            fprintf(outputFile, "double %s = %s;\n", var, expr);
+            fprintf(outputFile, "double %s = %s;\n", var, expression);
             declareVariable(var);
         // If the variable is already declared, just assign the value
         } else {
-            fprintf(outputFile, "%s = %s;\n", var, expr);
+            fprintf(outputFile, "%s = %s;\n", var, expression);
         }
         updateVariableDeclaration(var, false);  // Mark as undeclared
         return;
@@ -385,7 +418,7 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2 || !checkFileExtension(argv[1])) { // Check the file extension is .ml
+    if (argc < 2 || !checkFileExtension(argv[1])) { // Check the file extension is .ml
         fprintf(stderr, "!Usage: %s program.ml\n", argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -406,7 +439,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    fprintf(cFile, "#include <stdio.h>\n\n");  // Write standard headers for the C code
+    fprintf(cFile, "#include <stdio.h>\n#include <stdlib.h>\n\n");  // Write standard headers for the C code
 
     FILE *mainFuncFile = tmpfile();  // Create a temporary file to store main function body
     FILE *funcDefFile = tmpfile();  // Create a temporary file to store function definitions
