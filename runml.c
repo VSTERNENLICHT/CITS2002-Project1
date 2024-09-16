@@ -12,7 +12,6 @@
 #include <ctype.h> 
 #include <unistd.h>
 
-
 // Define a structure to track variables
 typedef struct {
     char name[50];
@@ -75,9 +74,10 @@ void declareVariable(const char* var) {
     varCount++;
 }
 
-// Translate ml syntax into c syntax
-void translateToC(FILE *outputFile, const char* line) {
-    if (strncmp(line, "\n", 1) == 0){
+// Translate ml syntax into c syntax and handle command line arguments
+void translateToC(FILE *outputFile, const char* line, int argc) {
+    
+    if (strncmp(line, "\n", 1) == 0) {
         fprintf(outputFile, "\n");  // Write comment to C file, excluding the new line character
         return;
     }
@@ -87,7 +87,7 @@ void translateToC(FILE *outputFile, const char* line) {
     if (commentPos != NULL) {
         *commentPos = '\0';  // Truncate the line at '#'
     }
-    
+
     // Handle function definition
     if (strncmp(line, "function", 8) == 0) {
         char funcName[50];
@@ -100,7 +100,7 @@ void translateToC(FILE *outputFile, const char* line) {
             exit(EXIT_FAILURE);
         }
 
-        fprintf(outputFile, "void %s(", funcName);  // Write the function definition
+        fprintf(outputFile, "void %s(", funcName);          // Write the function definition
 
         // Write each parameter, separating with commas
         for (int i = 1; i < paramCount; i++) {
@@ -120,6 +120,21 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "\tprint", 6) == 0) {
         char expression[200];
         sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
+        
+        // Replace argN with argv[N+1]
+        for (int i = 0; i < argc - 1; i++) {
+            char argPlaceholder[10];
+            snprintf(argPlaceholder, 10, "arg%d", i);
+            char argvReplacement[10];
+            snprintf(argvReplacement, 10, "argv[%d]", i + 1);
+            if (strstr(expression, argPlaceholder) != NULL) {
+                char *pos;
+                while ((pos = strstr(expression, argPlaceholder)) != NULL) {
+                    strncpy(pos, argvReplacement, strlen(argvReplacement));
+                }
+            }
+        }
+
         // Print the expression inside the function
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
@@ -133,6 +148,22 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "print ", 6) == 0) {
         char expression[200];
         sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
+        
+        // Replace argN with argv[N+1]
+        for (int i = 0; i < argc - 1; i++) {
+            char argPlaceholder[10];
+            snprintf(argPlaceholder, 10, "arg%d", i);
+            char argvReplacement[10];
+            snprintf(argvReplacement, 10, "argv[%d]", i + 1);
+            if (strstr(expression, argPlaceholder) != NULL) {
+                char *pos;
+                while ((pos = strstr(expression, argPlaceholder)) != NULL) {
+                    strncpy(pos, argvReplacement, strlen(argvReplacement));
+                }
+            }
+        }
+
+        // Print the expression outside the function
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "} else {\n");
@@ -144,11 +175,24 @@ void translateToC(FILE *outputFile, const char* line) {
     // Handle return statement inside a function
     if (strncmp(line, "\treturn", 7) == 0 || strncmp(line, "return", 6) == 0) {
         char expression[200];
-        
         if (line[0] == '\t') {
             sscanf(line + 8, "%[^\n]", expression);  // Extract everything after '\treturn'
         } else {
             sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'return'
+        }
+
+        // Replace argN with argv[N+1]
+        for (int i = 0; i < argc - 1; i++) {
+            char argPlaceholder[10];
+            snprintf(argPlaceholder, 10, "arg%d", i);
+            char argvReplacement[10];
+            snprintf(argvReplacement, 10, "argv[%d]", i + 1);
+            if (strstr(expression, argPlaceholder) != NULL) {
+                char *pos;
+                while ((pos = strstr(expression, argPlaceholder)) != NULL) {
+                    strncpy(pos, argvReplacement, strlen(argvReplacement));
+                }
+            }
         }
 
         fprintf(outputFile, "\treturn %s;\n", expression);  // Write the return statement
@@ -159,6 +203,21 @@ void translateToC(FILE *outputFile, const char* line) {
     if (strstr(line, "<-") != NULL) {
         char var[50], expr[200];
         sscanf(line, "%s <- %[^\n]", var, expr);  // Extract the variable and expression
+        
+        // Replace argN with argv[N+1]
+        for (int i = 0; i < argc - 2; i++) {
+            char argPlaceholder[10];
+            snprintf(argPlaceholder, 10, "arg%d", i);
+            char argvReplacement[10];
+            snprintf(argvReplacement, 10, "argv[%d]", i + 1);
+            if (strstr(expr, argPlaceholder) != NULL) {
+                char *pos;
+                while ((pos = strstr(expr, argPlaceholder)) != NULL) {
+                    strncpy(pos, argvReplacement, strlen(argvReplacement));
+                }
+            }
+        }
+
         // If the variable hasn't been declared, declare it as a double
         if (!isVariableDeclared(var)) {
             fprintf(outputFile, "double %s = %s;\n", var, expr);
@@ -171,15 +230,61 @@ void translateToC(FILE *outputFile, const char* line) {
         return;
     }
 
-    //Handle end of function block
-    if (strncmp(line, "end", 3) == 0) {
-        fprintf(outputFile, "}\n");  // Close function block in C
+    // Handle function call
+    if (strchr(line, '(') != NULL && strchr(line, ')') != NULL) {
+        fprintf(outputFile, "%s;\n", line);  // Treat as a function call
         return;
     }
 
+    // Check if the line contains a function call
+    printf("Processing line: %s\n", line);
+    if (strstr(line, "arg") != NULL) {
+        printf("====================================Detected arg in line: %s\n", line);
+        char modifiedLine[256];
+        strcpy(modifiedLine, line);
+        
+
+        // Replace "argX" with "atof(argv[X+1])"
+        for (int i = 0; i < argc - 1; i++) {
+            char argPattern[10];
+            snprintf(argPattern, sizeof(argPattern), "arg%d", i);
+
+            char replacement[50];
+            snprintf(replacement, sizeof(replacement), "atof(argv[%d])", i + 1);
+
+            // Replace occurrences of "argX" with "atof(argv[X+1])"
+            char *pos;
+            while ((pos = strstr(modifiedLine, argPattern)) != NULL) {
+                char temp[256];
+                strncpy(temp, modifiedLine, pos - modifiedLine);
+                temp[pos - modifiedLine] = '\0';
+
+                strcat(temp, replacement);
+                strcat(temp, pos + strlen(argPattern));
+
+                strcpy(modifiedLine, temp);
+            }
+        }
+
+        // Write the modified line to the output C file
+        fprintf(outputFile, "%s;\n", modifiedLine);
+        return;
+    }
+
+
     // Handle other expressions or function calls
     if (isalpha(line[0])) {
-        fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call
+        char var[50];
+        sscanf(line, "%s", var);  // Extract the first word (assumed to be a variable)
+
+        // If the variable hasn't been declared, initialize it with 0.0
+        if (!isVariableDeclared(var)) {
+            fprintf(outputFile, "double %s = 0.0;\n", var);
+            declareVariable(var);
+            return;
+        }
+
+        fprintf(outputFile, "%s;\n", line);  // Simple handling as a function call or expression
     }
 }
 
@@ -229,6 +334,7 @@ void cleanUpFiles(const char* cFileName, int pid) {
         fprintf(stderr, "Error removing the compiled executable: ml-%d\n", pid);
     }
 }
+
 // Function to write the main function body from one file to another
 void writeMainFunctionBody(FILE *inputFile, FILE *outputFile) {
     char line[256];
@@ -315,7 +421,7 @@ void processFunctionDefinitions(FILE *funcDefFile, FILE *cFile) {
                 }
 
                 // Concatenate the remaining part of the line after "void"
-                strcat(temp, pos + 4);  // Skip 4 characters ("void")
+                strcat(temp, pos + 4);
 
                 // Write the modified function definition to the C file
                 fputs(temp, cFile);
@@ -324,8 +430,7 @@ void processFunctionDefinitions(FILE *funcDefFile, FILE *cFile) {
                 functionOpen = true;
             }
         } else {
-            // Handle lines inside the function body
-            fputs(funcDefLine, cFile);
+            fputs(funcDefLine, cFile);  // Handle lines inside the function body
         }
     }
 
@@ -336,34 +441,35 @@ void processFunctionDefinitions(FILE *funcDefFile, FILE *cFile) {
 }
 
 // Function to process the lines from the input file, check syntax, and write to the appropriate file
-void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *mainFuncFile, FILE *cFile, bool *funcExists) {
+void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *mainFuncFile, FILE *cFile, bool *funcExists, int argc) {
     char line[256];
 
     while (fgets(line, sizeof(line), file)) {
-        line[strcspn(line, "\n")] = 0;  // Remove the newline character at the end of each line
+        line[strcspn(line, "\n")] = 0;  // Remove the newline character
 
-        // Check if the syntax is correct
+        printf("Read line: %s\n", line);  // 打印读取到的每一行
+
         if (isValidSyntax(line)) {
-            // If the line defines a function, write it to the function definitions section
+            printf("Syntax is valid: %s\n", line);  // 打印验证通过的行
+
             if (strncmp(line, "function", 8) == 0) {
                 *funcExists = true;
-                translateToC(funcDefFile, line);  // Write function definitions to funcDefFile
-            } 
-            // If the line starts with a tab, assume it's part of a function definition
-            else if (strncmp(line, "\t", 1) == 0) {
-                translateToC(funcDefFile, line);
-            } 
-            // For other lines, decide where to write based on whether a function has been encountered
-            else {
+                printf("Calling translateToC for function definition: %s\n", line); 
+                translateToC(funcDefFile, line, argc);  // Write function definitions to funcDefFile
+            } else if (strncmp(line, "\t", 1) == 0) {
+                printf("Calling translateToC for indented line: %s\n", line); 
+                translateToC(funcDefFile, line, argc);  // 处理缩进行
+            } else {
                 if (!*funcExists) {
-                    translateToC(upperFuncFile, line);  // Write lines before any function definition to upperFuncFile
+                    printf("Calling translateToC for upper section line: %s\n", line); 
+                    translateToC(upperFuncFile, line, argc);  // Write lines before any function definition to upperFuncFile
                 } else {
-                    translateToC(mainFuncFile, line);  // Write main function lines to mainFuncFile
+                    printf("Calling translateToC for main function line: %s\n", line); 
+                    translateToC(mainFuncFile, line, argc);  // Write main function lines to mainFuncFile
                 }
             }
-        } 
-        // Handle syntax errors
-        else {
+        } else {
+            printf("Syntax error: %s\n", line);  // 打印语法错误的行
             fprintf(stderr, "Syntax error in line: %s\n", line);
             fclose(file);
             fclose(cFile);
@@ -376,10 +482,11 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
 
 
 int main(int argc, char *argv[]) {
-    if (argc != 2 || !checkFileExtension(argv[1])) { // Check the file extension is .ml
-        fprintf(stderr, "Usage: %s program.ml\n", argv[0]);
+    if (argc < 2 || !checkFileExtension(argv[1])) { // Check the file extension is .ml and at least one argument exists
+        fprintf(stderr, "Usage: %s program.ml [args...]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+
 
     FILE *file = fopen(argv[1], "r");  // Open .ml file
     if (!file) {
@@ -405,7 +512,7 @@ int main(int argc, char *argv[]) {
     bool funcExists = false;  // Checks if lines for the main statement has been read
 
     // Read and process the .ml file line by line
-    processFileLines(file, funcDefFile, upperFuncFile, mainFuncFile, cFile, &funcExists);
+    processFileLines(file, funcDefFile, upperFuncFile, mainFuncFile, cFile, &funcExists, argc);
 
     // Move upperFuncFile tmp file to the top of the file
     fseek(upperFuncFile, 0, SEEK_SET);
@@ -415,8 +522,8 @@ int main(int argc, char *argv[]) {
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
     processFunctionDefinitions(funcDefFile, cFile);
 
-    // Write the main function header
-    fprintf(cFile, "int main() {\n");       
+    // Write the main function header with argc and argv
+    fprintf(cFile, "int main(int argc, char *argv[]) {\n");       
 
     // Write the main function body
     fseek(mainFuncFile, 0, SEEK_SET);  // Move to the beginning of the mainFuncFile
