@@ -237,21 +237,30 @@ void compileCFile(const char* cFileName, int pid) {
     }
 }
 
-// Run the compiled executable
-void runExecutable(char* cFileName) {
+// Run the compiled executable with arguments
+void runExecutable(char* cFileName, char* argv[], int argc) {
+    // Get the base executable name (removing ".c")
     int len = strlen(cFileName);
     cFileName[len - 2] = '\0';
-    const char* originalFileName = cFileName;  // Example file name
-    char executableFile[100];  // Buffer to hold the result with "./" prepended
 
-    // Use snprintf to concatenate "./" and the original file name safely
-    snprintf(executableFile, sizeof(executableFile), "./%s", originalFileName);
+    // Construct the full executable path
+    char executableFile[100];  // Buffer to hold the executable name
+    snprintf(executableFile, sizeof(executableFile), "./%s", cFileName);
 
-    int result = system(executableFile);  // Run the compiled executable
-    if (result != 0) {
-        fprintf(stderr, "!Error running the executable!\n"); 
-        exit(EXIT_FAILURE);
+    // Prepare argument list for execv
+    char* execArgs[argc + 1];  // Allocate an array for arguments
+    execArgs[0] = executableFile;  // First argument is the executable itself
+
+    // Copy command-line arguments passed to the script
+    for (int i = 1; i < argc; i++) {
+        execArgs[i] = argv[i];  // Pass the same arguments to the compiled executable
     }
+    execArgs[argc] = NULL;  // Last element must be NULL for execv
+
+    // Execute the compiled program with the provided arguments
+    execv(execArgs[0], execArgs);  // Run the executable with arguments
+    perror("!Error running the executable");
+    exit(EXIT_FAILURE);
 }
 
 // Remove the generated C file and the executable
@@ -476,8 +485,8 @@ int main(int argc, char *argv[]) {
     // Compile the generated C code
     compileCFile(cFileName, pid);
 
-    // Run the compiled program
-    runExecutable(cFileName);
+    // Run the compiled program with arguments
+    runExecutable(cFileName, argv, argc);
 
     // Remove the compiled and c file
     cleanUpFiles(cFileName, pid);
