@@ -392,7 +392,7 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
     char line[256];
 
     while (fgets(line, sizeof(line), file)) {
-        line[strcspn(line, "\n")] = 0;  // 去除行尾换行符
+        line[strcspn(line, "\n")] = 0;  // Remove the end-of-line newline character
 
         if (isValidSyntax(line)) {
             if (strncmp(line, "function", 8) == 0) {
@@ -420,7 +420,7 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
 
 
 int main(int argc, char *argv[]) {
-    if (argc < 2 || !checkFileExtension(argv[1])) {
+    if (argc < 2 || !checkFileExtension(argv[1])) {  // Check the file extension is .ml
         fprintf(stderr, "!Usage: %s program.ml\n", argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -431,47 +431,55 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    int pid = getpid();
+    int pid = getpid();  // Get process id to set program name
     char cFileName[50];
     snprintf(cFileName, sizeof(cFileName), "ml-%d.c", pid);
 
-    FILE *cFile = fopen(cFileName, "w");
+    FILE *cFile = fopen(cFileName, "w");  // Open a C file to write the translated C code
     if (!cFile) {
         fprintf(stderr, "!Error creating C file\n");
         exit(EXIT_FAILURE);
     }
 
-    fprintf(cFile, "#include <stdio.h>\n#include <stdlib.h>\n\n");
+    fprintf(cFile, "#include <stdio.h>\n#include <stdlib.h>\n\n");  // Write standard headers for the C code
 
-    FILE *mainFuncFile = tmpfile();
-    FILE *funcDefFile = tmpfile();
-    FILE *upperFuncFile = tmpfile();
-    FILE *varDeclarationsFile = tmpfile();  // 这个文件将存储变量声明
-    bool funcExists = false;
+    FILE *mainFuncFile = tmpfile();  // Create a temporary file to store main function body
+    FILE *funcDefFile = tmpfile();  // Create a temporary file to store function definitions
+    FILE *upperFuncFile = tmpfile();  // Create a temporary file to store lines before function
+    FILE *varDeclarationsFile = tmpfile();  // Create a temporary file to store varDeclarations
+    bool funcExists = false;  // Checks if lines for the main statement has been read
 
+    // Read and process the .ml file line by line
     processFileLines(file, funcDefFile, upperFuncFile, mainFuncFile, varDeclarationsFile, cFile, &funcExists);
+    
+    // Move upperFuncFile tmp file to the top of the file
     fseek(upperFuncFile, 0, SEEK_SET);
     processUpperFuncFile(upperFuncFile, cFile, mainFuncFile, funcExists);
 
     // Move function definitions to the top of the file
     fseek(funcDefFile, 0, SEEK_SET);  // Move to the beginning of the funcDefFile
     processFunctionDefinitions(funcDefFile, cFile);
-    // 将变量声明部分写入 main 函数开始处
+    // Write the variable declaration part to the beginning of the main function 
     fprintf(cFile, "int main(int argc, char *argv[]) {\n");
-    fseek(varDeclarationsFile, 0, SEEK_SET);  // 移动到变量声明文件的开头
-    writeMainFunctionBody(varDeclarationsFile, cFile);  // 将变量声明写到 main 函数开始
+    fseek(varDeclarationsFile, 0, SEEK_SET);  // Move to the beginning of the variable declaration file
+    writeMainFunctionBody(varDeclarationsFile, cFile);  // Write the variable declaration to the start of the main function
     fseek(mainFuncFile, 0, SEEK_SET);
-    writeMainFunctionBody(mainFuncFile, cFile);  // 将 main 函数体写入 C 文件
+    writeMainFunctionBody(mainFuncFile, cFile);  // Writes the body of the main function to a C file
+
+    // End the C program's main function
     fprintf(cFile, "return 0;\n}\n");
 
+     // Close files
     fclose(file);
     fclose(cFile);
     fclose(funcDefFile);
     fclose(mainFuncFile);
-
+    // Compile the generated C code
     compileCFile(cFileName, pid);
+    // Run the compiled program with arguments
     runExecutable(cFileName, argv, argc);
-    //cleanUpFiles(cFileName, pid);
+    // Remove the compiled and c file
+    cleanUpFiles(cFileName, pid);
 
     exit(EXIT_SUCCESS);
 }
