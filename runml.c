@@ -312,7 +312,7 @@ void processUpperFuncFile(FILE *inputFile, FILE *outputFile, FILE *mainFuncFile,
             }
         }
         // Write the possibly modified line into the appropriate file
-        if (funcExists) {
+        if (funcExists && (strstr(line, "arg") == NULL)) {  // If there is arg
             fputs(line, outputFile);
         } else {
             fputs(line, mainFuncFile);
