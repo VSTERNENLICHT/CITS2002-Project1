@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <ctype.h> 
 #include <unistd.h>
+#include <errno.h>
 
 
 // Define a structure to track variables
@@ -181,7 +182,6 @@ void translateToC(FILE *outputFile, const char* line) {
         }
 
         replaceArgWithArgv(expression); // Replace argN with argv[N]
-
         fprintf(outputFile, "\treturn %s;\n", expression);  // Write the return statement
         return;
     }
@@ -196,8 +196,7 @@ void translateToC(FILE *outputFile, const char* line) {
         if (!isVariableDeclared(var)) {
             fprintf(outputFile, "double %s = %s;\n", var, expression);
             declareVariable(var);
-        // If the variable is already declared, just assign the value
-        } else {
+        } else {    // If the variable is already declared, just assign the value
             fprintf(outputFile, "%s = %s;\n", var, expression);
         }
         updateVariableDeclaration(var, false);  // Mark as undeclared
@@ -239,47 +238,63 @@ void compileCFile(const char* cFileName, int pid) {
 
 // Run the compiled executable with arguments
 void runExecutable(char* cFileName, char* argv[], int argc) {
-    // Get the base executable name (removing ".c")
-    int len = strlen(cFileName);
-    cFileName[len - 2] = '\0';
+    pid_t pid = fork();  // Create a new process
 
-    // Construct the full executable path
-    char executableFile[100];  // Buffer to hold the executable name
-    snprintf(executableFile, sizeof(executableFile), "./%s", cFileName);
+    if (pid < 0) {
+        fprintf(stderr, "!Error forking: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // Child process: execute the compiled program
+        int len = strlen(cFileName);
+        cFileName[len - 2] = '\0';
 
-    // Prepare argument list for execv
-    char* execArgs[argc + 1];  // Allocate an array for arguments
-    execArgs[0] = executableFile;  // First argument is the executable itself
+        // Construct the full executable path
+        char executableFile[100];  // Buffer to hold the executable name
+        snprintf(executableFile, sizeof(executableFile), "./%s", cFileName);
 
-    // Copy command-line arguments passed to the script
-    for (int i = 1; i < argc; i++) {
-        execArgs[i] = argv[i];  // Pass the same arguments to the compiled executable
+        // Prepare argument list for execv
+        char* execArgs[argc + 1];  // Allocate an array for arguments
+        execArgs[0] = executableFile;  // First argument is the executable itself
+
+        // Copy command-line arguments passed to the script
+        for (int i = 1; i < argc; i++) {
+            execArgs[i] = argv[i];  // Pass the same arguments to the compiled executable
+        }
+        execArgs[argc] = NULL;  // Last element must be NULL for execv
+
+        // Execute the compiled program with the provided arguments
+        execv(execArgs[0], execArgs);  // Run the executable with arguments
+        fprintf(stderr, "!Error running the executable: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    } else {
+        // Parent process: wait for the child process to complete
+        int status;
+        waitpid(pid, &status, 0);  // Wait for the child process to finish
+
+        if (!WIFEXITED(status)) {
+            fprintf(stderr, "!Usage: Not enough arguments\n");
+            exit(EXIT_FAILURE);
+        } 
     }
-    execArgs[argc] = NULL;  // Last element must be NULL for execv
-
-    // Execute the compiled program with the provided arguments
-    execv(execArgs[0], execArgs);  // Run the executable with arguments
-    perror("!Error running the executable");
-    exit(EXIT_FAILURE);
 }
 
 // Remove the generated C file and the executable
 void cleanUpFiles(const char* cFileName, int pid) {
     // Remove the .c file
     char removeCFile[100];
-    snprintf(removeCFile, sizeof(removeCFile), "rm -f %s.c", cFileName);  // -f flag forces removal
+    snprintf(removeCFile, sizeof(removeCFile), "rm -f %s", cFileName);  // -f flag forces removal
     int removeCFileStatus = system(removeCFile);
     if (removeCFileStatus != 0) {
-        fprintf(stderr, "!Error removing the generated C file: %s\n", cFileName);
-    }
+        fprintf(stderr, "!Error removing the generated C file: %s.c (status: %d)\n", cFileName, removeCFileStatus);
+    } 
 
     // Remove the executable
     char removeExecutable[100];
     snprintf(removeExecutable, sizeof(removeExecutable), "rm -f ml-%d", pid);
     int removeExecStatus = system(removeExecutable);
     if (removeExecStatus != 0) {
-        fprintf(stderr, "!Error removing the compiled executable: ml-%d\n", pid);
-    }
+        fprintf(stderr, "!Error removing the compiled executable: ml-%d (status: %d)\n", pid, removeExecStatus);
+    } 
 }
 
 // Function to write the main function body from one file to another
@@ -307,7 +322,6 @@ void processUpperFuncFile(FILE *inputFile, FILE *outputFile, FILE *mainFuncFile,
                 // Concatenate "double" and the remaining part of the line after "void"
                 strcat(temp, "double");
                 strcat(temp, pos + 4);  // Skip 4 characters ("void")
-
                 strcpy(line, temp);  // Copy the modified line back into line
             }
         }
