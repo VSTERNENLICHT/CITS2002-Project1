@@ -407,7 +407,7 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
             } 
             // For other lines, decide where to write based on whether a function has been encountered
             else {
-                if (!*funcExists) {
+                if (!*funcExists && (strstr(line, "arg") == NULL)) {
                     translateToC(upperFuncFile, line);  // Write lines before any function definition to upperFuncFile
                 } else {
                     translateToC(mainFuncFile, line);  // Write main function lines to mainFuncFile
