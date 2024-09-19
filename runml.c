@@ -126,6 +126,7 @@ void runExecutable(char* cFileName, int argc, char* argv[], int filePid) {
 
     if (pid < 0) {
         fprintf(stderr, "!Error forking: %s\n", strerror(errno));
+        cleanUpFiles(cFileName, filePid);
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
         // Child process: execute the compiled program
@@ -149,6 +150,7 @@ void runExecutable(char* cFileName, int argc, char* argv[], int filePid) {
         // Execute the compiled program with the provided arguments
         execv(execArgs[0], execArgs);  // Run the executable with arguments
         fprintf(stderr, "!Error running the executable: %s\n", strerror(errno));
+        cleanUpFiles(cFileName, filePid);
         exit(EXIT_FAILURE);
     } else {
         // Parent process: wait for the child process to complete
@@ -157,6 +159,7 @@ void runExecutable(char* cFileName, int argc, char* argv[], int filePid) {
 
         if (!WIFEXITED(status)) {
             fprintf(stderr, "!Error: The program exited with an error\n");
+            cleanUpFiles(cFileName, filePid);
             exit(EXIT_FAILURE);
         } 
     }
@@ -289,7 +292,7 @@ void translateToC(FILE *outputFile, const char* line) {
 // Compile the generated C code
 void compileCFile(const char* cFileName, int pid) {
     char command[256];
-    snprintf(command, sizeof(command), "cc -std=c11 -Wall -Werror -o ml-%d %s", pid, cFileName);
+    snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
     if (result != 0) {
         fprintf(stderr, "!Error during compilation!\n"); 
