@@ -22,7 +22,7 @@ typedef struct {
 
 Variable variables[50]; // Declare an array to store variables
 int varCount = 0;
-int FuncdefineCount = 0;    // Track the number of open function blocks
+int funcDefineCount = 0;    // Track the number of open function blocks
 
 // Check if the file extension is .ml
 bool checkFileExtension(const char* filePath) {
@@ -199,7 +199,7 @@ void translateToC(FILE *outputFile, const char* line) {
 
         // Close the function parameter list and add the function body opening brace
         fprintf(outputFile, ") {\n");
-        FuncdefineCount++;
+        funcDefineCount++;
         return;
     }
 
