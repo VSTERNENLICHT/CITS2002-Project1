@@ -212,7 +212,7 @@ void translateToC(FILE *outputFile, const char* line) {
         sscanf(line + 7, "%[^\n]", expression);  // Extract everything after 'print'
         replaceArgWithArgv(expression); // Replace argN with argv[N]
 
-        // Print the expression inside the function
+        // Print the expression inside the function, printing double or int numbers
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "} else {\n");
@@ -227,6 +227,7 @@ void translateToC(FILE *outputFile, const char* line) {
         sscanf(line + 6, "%[^\n]", expression);  // Extract everything after 'print'
         replaceArgWithArgv(expression); // Replace argN with argv[N]
 
+        // Print the expression inside the function, printing double or int numbers
         fprintf(outputFile, "if ((double)((int)(%s)) == %s) {\n", expression, expression);
         fprintf(outputFile, "\tprintf(\"%%.0f\\n\", (double)%s);\n", expression);
         fprintf(outputFile, "} else {\n");
