@@ -101,6 +101,67 @@ void replaceArgWithArgv(char* expression) {
     }
 }
 
+// Remove the generated C file and the executable
+void cleanUpFiles(const char* cFileName, int pid) {
+    // Remove the .c file
+    char removeCFile[100];
+    snprintf(removeCFile, sizeof(removeCFile), "rm -f %s", cFileName);  // -f flag forces removal
+    int removeCFileStatus = system(removeCFile);
+    if (removeCFileStatus != 0) {
+        fprintf(stderr, "!Error removing the generated C file: %s.c (status: %d)\n", cFileName, removeCFileStatus);
+    } 
+
+    // Remove the executable
+    char removeExecutable[100];
+    snprintf(removeExecutable, sizeof(removeExecutable), "rm -f ml-%d", pid);
+    int removeExecStatus = system(removeExecutable);
+    if (removeExecStatus != 0) {
+        fprintf(stderr, "!Error removing the compiled executable: ml-%d (status: %d)\n", pid, removeExecStatus);
+    } 
+}
+
+// Run the compiled executable with arguments
+void runExecutable(char* cFileName, int argc, char* argv[], int filePid) {
+    pid_t pid = fork();  // Create a new process
+
+    if (pid < 0) {
+        fprintf(stderr, "!Error forking: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // Child process: execute the compiled program
+        int len = strlen(cFileName);
+        cFileName[len - 2] = '\0';
+
+        // Construct the full executable path
+        char executableFile[100];  // Buffer to hold the executable name
+        snprintf(executableFile, sizeof(executableFile), "./%s", cFileName);
+
+        // Prepare argument list for execv
+        char* execArgs[argc + 1];  // Allocate an array for arguments
+        execArgs[0] = executableFile;  // First argument is the executable itself
+
+        // Copy command-line arguments passed to the script
+        for (int i = 1; i < argc; i++) {
+            execArgs[i] = argv[i];  // Pass the same arguments to the compiled executable
+        }
+        execArgs[argc] = NULL;  // Last element must be NULL for execv
+
+        // Execute the compiled program with the provided arguments
+        execv(execArgs[0], execArgs);  // Run the executable with arguments
+        fprintf(stderr, "!Error running the executable: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    } else {
+        // Parent process: wait for the child process to complete
+        int status;
+        waitpid(pid, &status, 0);  // Wait for the child process to finish
+
+        if (!WIFEXITED(status)) {
+            fprintf(stderr, "!Error: The program exited with an error\n");
+            exit(EXIT_FAILURE);
+        } 
+    }
+}
+
 // Translate ml syntax into c syntax
 void translateToC(FILE *outputFile, const char* line) {
     if (strncmp(line, "\n", 1) == 0){
@@ -228,73 +289,13 @@ void translateToC(FILE *outputFile, const char* line) {
 // Compile the generated C code
 void compileCFile(const char* cFileName, int pid) {
     char command[256];
-    snprintf(command, sizeof(command), "cc -std=c11 -o ml-%d %s", pid, cFileName);
+    snprintf(command, sizeof(command), "cc -std=c11 -Wall -Werror -o ml-%d %s", pid, cFileName);
     int result = system(command);  // Compile the C file
     if (result != 0) {
         fprintf(stderr, "!Error during compilation!\n"); 
+        cleanUpFiles(cFileName, pid);
         exit(EXIT_FAILURE);
     }
-}
-
-// Run the compiled executable with arguments
-void runExecutable(char* cFileName, char* argv[], int argc) {
-    pid_t pid = fork();  // Create a new process
-
-    if (pid < 0) {
-        fprintf(stderr, "!Error forking: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    } else if (pid == 0) {
-        // Child process: execute the compiled program
-        int len = strlen(cFileName);
-        cFileName[len - 2] = '\0';
-
-        // Construct the full executable path
-        char executableFile[100];  // Buffer to hold the executable name
-        snprintf(executableFile, sizeof(executableFile), "./%s", cFileName);
-
-        // Prepare argument list for execv
-        char* execArgs[argc + 1];  // Allocate an array for arguments
-        execArgs[0] = executableFile;  // First argument is the executable itself
-
-        // Copy command-line arguments passed to the script
-        for (int i = 1; i < argc; i++) {
-            execArgs[i] = argv[i];  // Pass the same arguments to the compiled executable
-        }
-        execArgs[argc] = NULL;  // Last element must be NULL for execv
-
-        // Execute the compiled program with the provided arguments
-        execv(execArgs[0], execArgs);  // Run the executable with arguments
-        fprintf(stderr, "!Error running the executable: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    } else {
-        // Parent process: wait for the child process to complete
-        int status;
-        waitpid(pid, &status, 0);  // Wait for the child process to finish
-
-        if (!WIFEXITED(status)) {
-            fprintf(stderr, "!Usage: Not enough arguments\n");
-            exit(EXIT_FAILURE);
-        } 
-    }
-}
-
-// Remove the generated C file and the executable
-void cleanUpFiles(const char* cFileName, int pid) {
-    // Remove the .c file
-    char removeCFile[100];
-    snprintf(removeCFile, sizeof(removeCFile), "rm -f %s", cFileName);  // -f flag forces removal
-    int removeCFileStatus = system(removeCFile);
-    if (removeCFileStatus != 0) {
-        fprintf(stderr, "!Error removing the generated C file: %s.c (status: %d)\n", cFileName, removeCFileStatus);
-    } 
-
-    // Remove the executable
-    char removeExecutable[100];
-    snprintf(removeExecutable, sizeof(removeExecutable), "rm -f ml-%d", pid);
-    int removeExecStatus = system(removeExecutable);
-    if (removeExecStatus != 0) {
-        fprintf(stderr, "!Error removing the compiled executable: ml-%d (status: %d)\n", pid, removeExecStatus);
-    } 
 }
 
 // Function to write the main function body from one file to another
@@ -401,8 +402,21 @@ void processFunctionDefinitions(FILE *funcDefFile, FILE *cFile) {
     }
 }
 
+// Count arguments on .ml file
+int countArgs(const char* line) {
+    int count = 0;
+    for (int i = 0; i < 10; i++) {
+        char argPattern[10];
+        snprintf(argPattern, sizeof(argPattern), "arg%d", i);
+        if (strstr(line, argPattern) != NULL) {
+            count = i + 1;
+        }
+    }
+    return count;
+}
+
 // Function to process the lines from the input file, check syntax, and write to the appropriate file
-void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *mainFuncFile, FILE *cFile, bool *funcExists) {
+void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *mainFuncFile, FILE *cFile, bool *funcExists, int *requiredArgs) {
     char line[256];
 
     while (fgets(line, sizeof(line), file)) {
@@ -410,6 +424,12 @@ void processFileLines(FILE *file, FILE *funcDefFile, FILE *upperFuncFile, FILE *
 
         // Check if the syntax is correct
         if (isValidSyntax(line)) {
+            // Count the number of args used in the line
+            int argCount = countArgs(line);
+            if (argCount > *requiredArgs) {
+                *requiredArgs = argCount;  // Update the maximum number of args needed
+            }
+
             // If the line defines a function, write it to the function definitions section
             if (strncmp(line, "function", 8) == 0) {
                 *funcExists = true;
@@ -452,6 +472,15 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // Check if the file is empty
+    fseek(file, 0, SEEK_END);
+    if (ftell(file) == 0) {
+        fprintf(stderr, "!Error: The file %s is empty\n", argv[1]);
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+    rewind(file);  // Reset the file position to the beginning after checking its size
+
     int pid = getpid(); // Get process id to set program name
     char cFileName[50];
     snprintf(cFileName, sizeof(cFileName), "ml-%d.c", pid);
@@ -467,10 +496,11 @@ int main(int argc, char *argv[]) {
     FILE *mainFuncFile = tmpfile();  // Create a temporary file to store main function body
     FILE *funcDefFile = tmpfile();  // Create a temporary file to store function definitions
     FILE *upperFuncFile = tmpfile();  // Create a temporary file to store lines before function
-    bool funcExists = false;  // Checks if lines for the main statement has been read
+    bool funcExists = false;  // Checks if lines for the main statement have been read
+    int requiredArgs = 0;  // To track how many args are needed in the .ml file
 
     // Read and process the .ml file line by line
-    processFileLines(file, funcDefFile, upperFuncFile, mainFuncFile, cFile, &funcExists);
+    processFileLines(file, funcDefFile, upperFuncFile, mainFuncFile, cFile, &funcExists, &requiredArgs);
 
     // Move upperFuncFile tmp file to the top of the file
     fseek(upperFuncFile, 0, SEEK_SET);
@@ -481,7 +511,13 @@ int main(int argc, char *argv[]) {
     processFunctionDefinitions(funcDefFile, cFile);
 
     // Write the main function header
-    fprintf(cFile, "int main(int argc, char *argv[]) {\n");       
+    fprintf(cFile, "int main(int argc, char *argv[]) {\n");
+
+    // Add a check for the required number of arguments
+    fprintf(cFile, "if (argc < %d) {\n", requiredArgs + 2);  // +2 for the program name and .ml file
+    fprintf(cFile, "    fprintf(stderr, \"!Error: This program requires at least %d arguments (arg0 to arg%d)\\n\");\n", requiredArgs, requiredArgs - 1);
+    fprintf(cFile, "    exit(EXIT_FAILURE);\n");
+    fprintf(cFile, "}\n");
 
     // Write the main function body
     fseek(mainFuncFile, 0, SEEK_SET);  // Move to the beginning of the mainFuncFile
@@ -500,7 +536,7 @@ int main(int argc, char *argv[]) {
     compileCFile(cFileName, pid);
 
     // Run the compiled program with arguments
-    runExecutable(cFileName, argv, argc);
+    runExecutable(cFileName, argc, argv, pid);
 
     // Remove the compiled and c file
     cleanUpFiles(cFileName, pid);
